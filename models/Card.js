@@ -7,6 +7,11 @@ const CardSchema = new Schema({
     required: true,
     trim: true
   },
+  productCode: {
+    type: String,
+    required: true,
+    trim: true
+  },
   product: {
     type: String,
     required: true,
@@ -31,15 +36,15 @@ const CardSchema = new Schema({
   status: {
     type: String,
     required: true,
-    enum: ['created', 'used', 'expired'],
+    enum: ['created', 'used', 'expired', 'sold'],
     default: 'created'
   },
-  usedBy: {
-    type: mongoose.Schema.Types.ObjectId,
+  purchasedBy: {
+    type: Schema.Types.ObjectId,
     ref: 'User',
     default: null
   },
-  usedAt: {
+  purchasedAt: {
     type: Date,
     default: null
   }

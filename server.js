@@ -1,6 +1,7 @@
 require('./models/User')
 require('./models/Error')
 require('./models/Card')
+require('./models/Payment')
 const express = require('express')
 const path = require('path')
 const exphbs = require('express-handlebars')

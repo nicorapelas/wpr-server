@@ -4,6 +4,7 @@ const db = require('../config/keys').keys
 const mongoOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+  useFindAndModify: false,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
   writeConcern: {

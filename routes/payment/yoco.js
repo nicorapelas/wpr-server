@@ -1,25 +1,29 @@
 const express = require('express')
 const router = express.Router()
 const axios = require('axios')
+
 const { keys } = require('../../config/keys')
+const Payment = require('../../models/Payment')
+const Card = require('../../models/Card') 
+const User = require('../../models/User')
+const requireAuth = require('../../middlewares/requireAuth')
 
 const YOCO_SECRET_KEY = keys.yoco.secretKey
 const YOCO_API_URL = 'https://payments.yoco.com/api/'
-const FRONTEND_URL = 'https://782d-105-245-112-38.ngrok-free.app'
+const FRONTEND_URL = 'https://f0b4-41-145-194-61.ngrok-free.app'
+const BACKEND_URL = 'https://f627-41-150-34-61.ngrok-free.app'
 
-router.post('/create-payment', async (req, res) => {
+router.post('/create-payment', requireAuth, async (req, res) => {
+  const { amountInCents, currency, description, productCode } = req.body
+    
   try {
-    const { amountInCents, currency, description } = req.body
-
-    console.log('Success URL:', `${FRONTEND_URL}/payment-success`)
-    console.log('Cancel URL:', `${FRONTEND_URL}/payment-cancelled`)
-
     const checkoutData = {
       amount: amountInCents,
       currency: currency,
       description: description,
       successUrl: `${FRONTEND_URL}/payment-success`,
-      cancelUrl: `${FRONTEND_URL}/payment-cancelled`,
+      cancelUrl: `${FRONTEND_URL}/payment-cancelled?reason=user_back`,
+      backUrl: `${FRONTEND_URL}/payment-cancelled?reason=browser_back`,
       failureUrl: `${FRONTEND_URL}/payment-cancelled`,
       successMessage: 'Payment successful! You will be redirected automatically.',
       returnButton: {
@@ -30,16 +34,19 @@ router.post('/create-payment', async (req, res) => {
       payment_methods: ['card'],
       layout: {
         show_cancel: true,
-        cancel_text: 'Cancel Payment'
+        cancel_text: 'Cancel Payment',
+        show_back: true,
+        back_text: 'Go Back'
       },
       metadata: {
         order_id: Date.now().toString(),
         checkoutId: null,
-        paymentFacilitator: "yoco-online-checkout"
-      }
+        paymentFacilitator: "yoco-online-checkout",
+        description: description,
+        productCode: productCode,
+        _user: req.user._id
+             }
     }
-
-    console.log('Sending checkout data:', checkoutData)
 
     const response = await axios({
       method: 'post',
@@ -51,7 +58,24 @@ router.post('/create-payment', async (req, res) => {
       data: checkoutData
     })
 
-    console.log('Yoco Checkout Response:', JSON.stringify(response.data, null, 2))
+    await Payment.findOneAndUpdate(
+      {
+        _user: req.user,
+        status: 'created',
+        productCode: productCode,
+        createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) }
+      },
+      {
+        $set: {
+          checkoutId: response.data.id,
+          orderId: checkoutData.metadata.order_id,
+          amount: checkoutData.amount,
+          currency: checkoutData.currency,
+          metadata: response.data.metadata
+        }
+      },
+      { new: true, upsert: true }
+    )
     res.json(response.data)
 
   } catch (error) {
@@ -62,11 +86,112 @@ router.post('/create-payment', async (req, res) => {
   }
 })
 
-// Add webhook handler for payment notifications
+// Add body-parser raw configuration to preserve raw body for webhook verification
+router.use('/webhook', express.raw({type: 'application/json'}));
+
 router.post('/webhook', async (req, res) => {
-  const event = req.body
-  console.log('Webhook received:', event)
-  res.json({ received: true })
+  try {
+    // Parse the raw body if it hasn't been parsed
+    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    // Add more detailed logging
+    if (!event.type || !event.payload) {
+      console.log('Invalid event structure received');
+      return res.status(400).json({ error: 'Invalid event structure' });
+    }
+
+    switch (event.type) {
+      case 'payment.succeeded': {
+        const { payload } = event
+        const { metadata } = payload
+        const { description, _user, productCode } = metadata
+        
+        const checkoutId = payload.metadata?.checkoutId || 
+                           payload.checkoutId ||
+                           payload.checkout_id ||
+                           payload.id
+        
+        if (!checkoutId) {
+          return res.status(400).json({ error: 'Missing checkoutId' })
+        }
+
+        const payment = await Payment.findOne({ checkoutId })
+              
+        if (payment) {
+          payment.status = 'succeeded'  
+          payment.productCode = productCode
+          payment.paymentId = payload.id
+          payment._user = _user
+          payment.updatedAt = new Date()
+          payment.metadata = {
+            ...payment.metadata,
+            paymentMethodDetails: payload.paymentMethodDetails,
+            mode: payload.mode,
+            completedAt: payload.createdDate
+          }
+          await payment.save()
+
+          // Find and update the first available card
+          const card = await Card.findOneAndUpdate(
+            { 
+              productCode: productCode, 
+              status: { $ne: 'sold' } 
+            },
+            { 
+              status: 'sold',
+              purchasedBy: _user,
+              purchasedAt: new Date()
+            },
+            { new: true }
+          )
+
+          if (!card) {
+            console.warn(`No available cards found for product: ${description}`)
+          }
+
+        } else {
+          console.warn(`Payment record not found for checkoutId: ${checkoutId}`)
+        }
+        break
+      }
+
+      case 'payment.failed': {
+        const { payload } = event
+        const checkoutId = payload.metadata?.checkoutId
+
+        if (checkoutId) {
+          const payment = await Payment.findOne({ checkoutId })
+          
+          if (payment) {
+            payment.status = 'failed'
+            payment.errorMessage = payload.failureReason || 'Payment failed'
+            payment.updatedAt = new Date()
+            await payment.save()
+          }
+        }
+        break
+      }
+
+      default: {
+        console.log(`Unhandled event type: ${event.type}`)
+      }
+    }
+
+    // Send 200 status explicitly as mentioned in docs
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('Webhook Error:', error);
+    // Still send 200 to prevent retries, but include error
+    res.status(200).json({ received: true, error: error.message });
+  }
 })
 
 module.exports = router
+
+
+// curl --location --request POST 'https://payments.yoco.com/api/webhooks' \
+// --header 'Content-Type: application/json' \
+// --header 'Authorization: Bearer sk_test_36d1b424Q4LLBGB5464497f89b88' \
+// --data-raw '{
+//   "name": "payment-webhook",
+//   "url": "https://f627-41-150-34-61.ngrok-free.app/payment/webhook"
+// }'
