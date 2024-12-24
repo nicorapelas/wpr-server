@@ -130,24 +130,42 @@ router.post('/webhook', async (req, res) => {
           }
           await payment.save()
 
-          // Find and update the first available card
-          const card = await Card.findOneAndUpdate(
-            { 
-              productCode: productCode, 
-              status: { $ne: 'sold' } 
-            },
-            { 
-              status: 'sold',
-              purchasedBy: _user,
-              purchasedAt: new Date()
-            },
-            { new: true }
-          )
+          // Determine number of cards based on product code
+          let cardCount;
+          console.log(`productCode:`, productCode);
 
-          if (!card) {
-            console.warn(`No available cards found for product: ${description}`)
+          switch(productCode) {
+            case 'WP002':
+              cardCount = 5;
+              break;
+            case 'WP003':
+              cardCount = 10;
+              break;
+            default: // WP001 and any other cases
+              cardCount = 1;
           }
 
+          // Find and update multiple cards
+          const cards = await Card.find({ status: { $ne: 'sold' } })
+            .limit(cardCount)
+            .exec();
+
+          if (cards.length < cardCount) {
+            console.warn(`Insufficient cards available. Requested: ${cardCount}, Found: ${cards.length}`);
+          }
+
+          // Update only the specific cards found
+          if (cards.length > 0) {
+            const cardIds = cards.map(card => card._id);
+            await Card.updateMany(
+              { _id: { $in: cardIds } },
+              {
+                status: 'sold',
+                purchasedBy: _user,
+                purchasedAt: new Date()
+              }
+            );
+          }
         } else {
           console.warn(`Payment record not found for checkoutId: ${checkoutId}`)
         }
@@ -183,6 +201,13 @@ router.post('/webhook', async (req, res) => {
     // Still send 200 to prevent retries, but include error
     res.status(200).json({ received: true, error: error.message });
   }
+})
+
+router.post('/fetch-purchase-history', requireAuth, async (req, res) => {
+  const { ownerId } = req.body
+  const payments = await Payment.find({ _user: ownerId })
+  console.log(`payments:`, payments)
+  res.json(payments)
 })
 
 module.exports = router

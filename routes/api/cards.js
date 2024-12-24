@@ -1,6 +1,7 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const Card = mongoose.model('Card')
+const User = mongoose.model('User')
 const keys = require('../../config/keys').keys
 const requireAuth = require('../../middlewares/requireAuth')
 const router = express.Router()
@@ -50,7 +51,7 @@ router.post('/', requireAuth, async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
-
+  
 router.post('/batch', async (req, res) => {
   try {
     const { cards } = req.body
@@ -92,6 +93,22 @@ router.post('/batch', async (req, res) => {
     console.error('Batch creation error:', error)
     res.status(500).json({ error: 'Failed to create card batch' })
   }
+})
+
+router.get('/fetch-user-cards', requireAuth, async (req, res) => {
+  const cards = await Card.find({ purchasedBy: req.user._id })
+  res.json(cards)
+})
+
+// Admin route
+router.post('/fetch-card-owner', async (req, res) => {
+  const { ownerId } = req.body
+  console.log(req.body)
+  
+  const owner = await User.findById({ _id: ownerId })
+  console.log(`owner:`, owner)
+  
+  res.json(owner)
 })
 
 module.exports = router;

@@ -7,11 +7,6 @@ const CardSchema = new Schema({
     required: true,
     trim: true
   },
-  productCode: {
-    type: String,
-    required: true,
-    trim: true
-  },
   product: {
     type: String,
     required: true,

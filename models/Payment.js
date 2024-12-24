@@ -6,14 +6,10 @@ const PaymentSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User'
   },
-  checkoutId: {
-    type: String,
-    required: true,
-    unique: true
-  },
   orderId: {
     type: String,
-    required: true
+    unique: true,
+    sparse: true
   },
   amount: {
     type: Number,
@@ -25,7 +21,7 @@ const PaymentSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['created', 'processing', 'succeeded', 'failed', 'cancelled'],
+    enum: ['created', 'succeeded', 'failed'],
     default: 'created'
   },
   productCode: {

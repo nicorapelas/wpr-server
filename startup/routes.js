@@ -9,6 +9,7 @@ const cards = require('../routes/api/cards')
 const error = require('../routes/error/error')
 // Import payment routes
 const yoco = require('../routes/payment/yoco')
+const payfast = require('../routes/payment/payfast')
 
 module.exports = (app) => {
   // Express middleware
@@ -23,6 +24,6 @@ module.exports = (app) => {
   app.use('/cards', cards)
   app.use('/error', error)
   // Use payment routes
-  app.use('/payment', yoco)
+  // app.use('/payment', yoco)
+  app.use('/payment', payfast)
 }
-
