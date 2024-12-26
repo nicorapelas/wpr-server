@@ -1,19 +1,10 @@
 const express = require('express')
 const mongoose = require('mongoose')
-const async = require('async')
 const jwt = require('jsonwebtoken')
 const passport = require('passport')
-const crypto = require('crypto')
-const path = require('path')
-const nodemailer = require('nodemailer')
-var hbs = require('nodemailer-express-handlebars')
 const User = mongoose.model('User')
 const keys = require('../../config/keys').keys
 const requireAuth = require('../../middlewares/requireAuth')
-const validateRegisterInput = require('../../validation/register')
-const validateLoginInput = require('../../validation/login')
-const validateEmailInput = require('../../validation/email')
-const validatePasswordReset = require('../../validation/passwordReset')
 
 const router = express.Router()
 
