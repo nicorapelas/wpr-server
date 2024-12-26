@@ -4,7 +4,6 @@ const async = require('async')
 const jwt = require('jsonwebtoken')
 const passport = require('passport')
 const crypto = require('crypto')
-const cloudinary = require('cloudinary')
 const path = require('path')
 const nodemailer = require('nodemailer')
 var hbs = require('nodemailer-express-handlebars')
@@ -17,12 +16,6 @@ const validateEmailInput = require('../../validation/email')
 const validatePasswordReset = require('../../validation/passwordReset')
 
 const router = express.Router()
-
-cloudinary.config({
-  cloud_name: keys.cloudinary.cloud_name,
-  api_key: keys.cloudinary.api_key,
-  api_secret: keys.cloudinary.api_secret,
-})
 
 // Forgot password mailer options
 mailManForgotPassword = (email, token) => {
