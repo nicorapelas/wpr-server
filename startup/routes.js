@@ -8,7 +8,7 @@ const user = require('../routes/auth/local')
 const cards = require('../routes/api/cards')
 const error = require('../routes/error/error')
 // Import payment routes
-const yoco = require('../routes/payment/yoco')
+// const yoco = require('../routes/payment/yoco')
 const payfast = require('../routes/payment/payfast')
 
 module.exports = (app) => {
