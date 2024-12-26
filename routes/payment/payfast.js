@@ -11,8 +11,8 @@ const requireAuth = require('../../middlewares/requireAuth')
 const PAYFAST_MERCHANT_ID = '10000100'  // Sandbox merchant ID
 const PAYFAST_MERCHANT_KEY = '46f0cd694581a'  // Sandbox merchant key
 const PAYFAST_PASSPHRASE = 'jt7NOE43FZPn'  // Optional sandbox passphrase
-const FRONTEND_URL = 'https://big-moons-melt.loca.lt'
-const BACKEND_URL = 'https://5887-197-185-133-79.ngrok-free.app'
+const FRONTEND_URL = 'https://charming-biscuit-df1d0f.netlify.app'
+const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com/'
 const TEST_EMAIL = 'nicorapelas@gmail.com'
 
 const generateSignature = (data) => {
