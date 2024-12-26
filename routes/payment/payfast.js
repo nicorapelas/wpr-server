@@ -7,12 +7,15 @@ const { keys } = require('../../config/keys')
 const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
 const requireAuth = require('../../middlewares/requireAuth')
+const { log } = require('console')
 
 const PAYFAST_MERCHANT_ID = '10000100'  // Sandbox merchant ID
 const PAYFAST_MERCHANT_KEY = '46f0cd694581a'  // Sandbox merchant key
 const PAYFAST_PASSPHRASE = 'jt7NOE43FZPn'  // Optional sandbox passphrase
-const FRONTEND_URL = 'https://charming-biscuit-df1d0f.netlify.app'
-const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com/'
+const FRONTEND_URL = 'https://wlpsa-e99e9e05bd50.herokuapp.com'
+// const FRONTEND_URL = 'https://fancy-signs-fold.loca.lt'
+const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
+// const BACKEND_URL = 'https://5397-197-184-78-10.ngrok-free.app'
 const TEST_EMAIL = 'nicorapelas@gmail.com'
 
 const generateSignature = (data) => {
@@ -39,6 +42,7 @@ const generateSignature = (data) => {
 }
 
 router.post('/create-payment', requireAuth, async (req, res) => {
+  console.log(req.body)
   const { amountInCents, currency, productCode } = req.body
   
   try {
