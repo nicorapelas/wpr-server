@@ -87,7 +87,6 @@ router.post('/register', async (req, res) => {
 // @access public
 router.post('/login', async (req, res) => {
   console.log(`AT LOGIN ROUTE:`, req.body)
-
   // Validation check
   const errors = {}
   const { email, password } = req.body
@@ -135,6 +134,7 @@ router.post(
   '/login-web',
   passport.authenticate('local', { session: false }),
   (req, res) => {
+    console.log(`AT LOGIN ROUTE..!:`, req.body)
     if (req.isAuthenticated()) {
       const { _id, username, role } = req.user
       const token = signToken(_id)
