@@ -86,6 +86,8 @@ router.post('/register', async (req, res) => {
 // @desc   Login a user and respond with JWT
 // @access public
 router.post('/login', async (req, res) => {
+  console.log(`AT LOGIN ROUTE:`, req.body)
+
   // Validation check
   const errors = {}
   const { email, password } = req.body
