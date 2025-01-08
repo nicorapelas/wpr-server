@@ -37,7 +37,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     const paymentData = {
       amount: payfastModifiedAmount,
       cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      email_address: 'jacobscycles@gmail.com',
+      email_address: req.user.email,
       item_name: 'Watchlist Pro Subscription',
       m_payment_id: Date.now().toString(),
       merchant_id: PAYFAST_MERCHANT_ID,
