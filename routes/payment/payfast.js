@@ -69,17 +69,30 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     )
 
     const paymentData = {
-      amount: payfastModifiedAmount,
-      cancel_url: cancelUrl,
-      email_address: 'jacobscycles@gmail.com',
-      item_name: 'Watchlist Pro Subscription',
-      m_payment_id: Date.now().toString(),
+      // Merchant details
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
+      return_url: returnUrl,
+      cancel_url: cancelUrl,
+      notify_url: notifyUrl,
+
+      // Buyer details
       name_first: req.user.firstName || 'Unknown',
       name_last: req.user.lastName || 'Unknown',
-      notify_url: notifyUrl,
-      return_url: returnUrl,
+      email_address: 'jacobscycles@gmail.com',
+
+      // Transaction details
+      m_payment_id: Date.now().toString(),
+      amount: payfastModifiedAmount,
+      item_name: 'Watchlist Pro Subscription',
+      item_description: `Purchase of ${productCode}`,
+      custom_str1: productCode,
+      custom_str2: req.user._id?.toString() || 'unknown',
+      custom_str3: currency,
+
+      // Payment options
+      payment_method: 'cc',
+      subscription_type: '1', // Non-recurring payment
     }
 
     // Generate signature
