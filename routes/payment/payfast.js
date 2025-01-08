@@ -33,7 +33,11 @@ function generateSignature(data, passPhrase = null) {
 
   // Create parameter string
   const signString = Object.entries(ordered)
-    .map(([key, value]) => `${key}=${encodeURIComponent(value.trim())}`)
+    .map(([key, value]) => {
+      // Convert all values to strings and trim
+      const stringValue = String(value).trim()
+      return `${key}=${encodeURIComponent(stringValue)}`
+    })
     .join('&')
 
   // Generate signature
