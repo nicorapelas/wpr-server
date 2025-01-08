@@ -66,13 +66,6 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       })
     }
 
-    // Ensure we have a valid email
-    if (!req.user.email) {
-      return res.status(400).json({
-        message: 'User email is required for payment',
-      })
-    }
-
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
       merchant_id: PAYFAST_MERCHANT_ID,
@@ -82,7 +75,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       notify_url: `${BACKEND_URL}/payment/webhook`,
       name_first: req.user.firstName || 'Unknown',
       name_last: req.user.lastName || 'Unknown',
-      email_address: req.user.email,
+      email_address: 'jacobscycles@gmail.com',
       m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
       item_name: 'WatchList Pro Subscription',
