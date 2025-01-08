@@ -69,19 +69,14 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     )
 
     const paymentData = {
-      // Merchant details
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,
-
-      // Buyer details
       name_first: req.user.firstName || 'Unknown',
       name_last: req.user.lastName || 'Unknown',
       email_address: 'jacobscycles@gmail.com',
-
-      // Transaction details
       m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
       item_name: 'Watchlist Pro Subscription',
@@ -89,8 +84,6 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       custom_str1: productCode,
       custom_str2: req.user._id?.toString() || 'unknown',
       custom_str3: currency,
-
-      // Payment options
       payment_method: 'cc',
     }
 
@@ -99,28 +92,25 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
     console.log('Payment Data:', paymentData)
 
-    // Create payment record
-    await Payment.findOneAndUpdate(
-      {
-        _user: req.user,
-        status: 'created',
-        productCode: productCode,
-        createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
-      },
-      {
-        $set: {
-          orderId: paymentData.m_payment_id,
-          amount: amountInCents,
-          currency: currency,
-          metadata: paymentData,
-        },
-      },
-      { new: true, upsert: true }
-    )
-    res.json({
-      redirectUrl: 'https://www.payfast.co.za/eng/process',
-      paymentData,
-    })
+    // Create HTML form for auto-submission
+    const formHtml = `
+      <html>
+        <body>
+          <form id="payfast-form" method="POST" action="https://www.payfast.co.za/eng/process">
+            ${Object.entries(paymentData)
+              .map(
+                ([key, value]) =>
+                  `<input type="hidden" name="${key}" value="${value}">`
+              )
+              .join('\n')}
+          </form>
+          <script>document.getElementById('payfast-form').submit();</script>
+        </body>
+      </html>
+    `
+
+    // Send the form HTML instead of JSON
+    res.send(formHtml)
   } catch (error) {
     console.error('Payfast Error:', error.response?.data || error.message)
     res.status(500).json({
