@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const crypto = require('crypto')
 
 const { keys } = require('../../config/keys')
 const Payment = require('../../models/Payment')
@@ -11,6 +12,25 @@ const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
 
 const FRONTEND_URL = 'https://www.watchlistpro.site/'
 const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
+
+// Add helper function for signature
+function generateSignature(data, passPhrase = null) {
+  // Create parameter string
+  let pfOutput = Object.keys(data)
+    .filter((key) => key !== 'signature')
+    .sort()
+    .map(
+      (key) => `${key}=${encodeURIComponent(data[key]).replace(/%20/g, '+')}`
+    )
+    .join('&')
+
+  // Add passphrase if it exists
+  if (passPhrase !== null) {
+    pfOutput = `${pfOutput}&passphrase=${encodeURIComponent(passPhrase)}`
+  }
+
+  return crypto.createHash('md5').update(pfOutput).digest('hex')
+}
 
 router.post('/create-payment', requireAuth, async (req, res) => {
   console.log('PayFast Credentials:', {
@@ -33,19 +53,37 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       })
     }
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
+
+    // Fix URLs by removing extra slashes
+    const cancelUrl = `${FRONTEND_URL}payment-cancelled`.replace(
+      /([^:]\/)\/+/g,
+      '$1'
+    )
+    const returnUrl = `${FRONTEND_URL}payment-success`.replace(
+      /([^:]\/)\/+/g,
+      '$1'
+    )
+    const notifyUrl = `${BACKEND_URL}/payment/webhook`.replace(
+      /([^:]\/)\/+/g,
+      '$1'
+    )
+
     const paymentData = {
       amount: payfastModifiedAmount,
-      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      email_address: req.user.email || 'jacobscycles@gmail.com',
+      cancel_url: cancelUrl,
+      email_address: 'jacobscycles@gmail.com',
       item_name: 'Watchlist Pro Subscription',
       m_payment_id: Date.now().toString(),
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
       name_first: req.user.firstName || 'Unknown',
       name_last: req.user.lastName || 'Unknown',
-      notify_url: `${BACKEND_URL}/payment/webhook`,
-      return_url: `${FRONTEND_URL}/payment-success`,
+      notify_url: notifyUrl,
+      return_url: returnUrl,
     }
+
+    // Generate signature
+    paymentData.signature = generateSignature(paymentData)
 
     console.log('Payment Data:', paymentData)
 
