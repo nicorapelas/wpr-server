@@ -41,9 +41,15 @@ function generateSignature(data, passPhrase = null) {
 }
 
 router.post('/create-payment', requireAuth, async (req, res) => {
-  console.log(req.body)
-  const { amountInCents, currency, productCode, description } = req.body
   try {
+    console.log('PayFast Credentials:', {
+      merchantId: PAYFAST_MERCHANT_ID,
+      merchantKey: PAYFAST_MERCHANT_KEY,
+    })
+
+    const { amountInCents, currency, productCode, description } = req.body
+    console.log(req.body)
+
     // Validate required fields
     if (!amountInCents || !currency || !productCode) {
       console.error('Missing required fields:', {
@@ -55,12 +61,14 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         message: 'Missing required fields',
       })
     }
+
     // Ensure we have a valid email
     if (!req.user.email) {
       return res.status(400).json({
         message: 'User email is required for payment',
       })
     }
+
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
       merchant_id: PAYFAST_MERCHANT_ID,
@@ -81,37 +89,51 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       payment_method: 'cc',
     }
 
-    // Generate signature using PAYFAST_PASS_PHRASE instead of keys.payfast.passPhrase
+    console.log('Payment Data:', paymentData)
+
+    // Generate signature
     const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
     paymentData.signature = signature
 
-    // Create payment record
-    await Payment.findOneAndUpdate(
-      {
-        _user: req.user,
-        status: 'created',
-        productCode: productCode,
-        createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
-      },
-      {
-        $set: {
-          orderId: paymentData.m_payment_id,
-          amount: amountInCents,
-          currency: currency,
-          metadata: paymentData,
+    try {
+      // Create payment record
+      await Payment.findOneAndUpdate(
+        {
+          _user: req.user,
+          status: 'created',
+          productCode: productCode,
+          createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
         },
-      },
-      { new: true, upsert: true }
-    )
+        {
+          $set: {
+            orderId: paymentData.m_payment_id,
+            amount: amountInCents,
+            currency: currency,
+            metadata: paymentData,
+          },
+        },
+        { new: true, upsert: true }
+      )
+    } catch (dbError) {
+      console.error('Database Error:', dbError)
+      throw new Error('Failed to create payment record')
+    }
 
     res.json({
       redirectUrl: 'https://www.payfast.co.za/eng/process',
       paymentData,
     })
   } catch (error) {
-    console.error('Payfast Error:', error.response?.data || error.message)
+    console.error('Payfast Error Details:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+    })
+
     res.status(500).json({
-      message: error.response?.data?.message || 'Payment failed',
+      message: 'Payment initialization failed',
+      error: error.message,
+      details: error.response?.data,
     })
   }
 })
