@@ -9,7 +9,7 @@ const requireAuth = require('../../middlewares/requireAuth')
 const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
 const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
 
-const FRONTEND_URL = 'https://www.watchlistpro.site/'
+const FRONTEND_URL = 'https://www.watchlistpro.site'
 const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
 
 router.post('/create-payment', requireAuth, async (req, res) => {
@@ -37,16 +37,15 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     const paymentData = {
       amount: payfastModifiedAmount,
       cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      email_address: 'test@test.com',
-      item_name: 'Test Product',
+      email_address: 'jacobscycles@gmail.com',
+      item_name: 'WatchList Pro Subscription',
       m_payment_id: Date.now().toString(),
-      merchant_id: '10000100',
-      merchant_key: '46f0cd694581a',
-      name_first: 'Test',
-      name_last: 'User',
+      merchant_id: PAYFAST_MERCHANT_ID,
+      merchant_key: PAYFAST_MERCHANT_KEY,
+      name_first: req.user.firstName || 'Unknown',
+      name_last: req.user.lastName || 'Unknown',
       notify_url: `${BACKEND_URL}/payment/webhook`,
       return_url: `${FRONTEND_URL}/payment-success`,
-      testing: 'true',
     }
 
     // Create payment record
@@ -68,7 +67,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       { new: true, upsert: true }
     )
     res.json({
-      redirectUrl: 'https://sandbox.payfast.co.za/eng/process', // Use sandbox URL for testing
+      redirectUrl: 'https://www.payfast.co.za/eng/process',
       paymentData,
     })
   } catch (error) {
