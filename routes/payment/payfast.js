@@ -13,6 +13,11 @@ const FRONTEND_URL = 'https://www.watchlistpro.site/'
 const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
 
 router.post('/create-payment', requireAuth, async (req, res) => {
+  console.log('PayFast Credentials:', {
+    merchantId: PAYFAST_MERCHANT_ID,
+    merchantKey: PAYFAST_MERCHANT_KEY,
+  })
+
   console.log(req.body)
   const { amountInCents, currency, productCode } = req.body
   try {
@@ -31,7 +36,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     const paymentData = {
       amount: payfastModifiedAmount,
       cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      email_address: 'jacobscycles@gmail.com',
+      email_address: req.user.email || 'jacobscycles@gmail.com',
       item_name: 'Watchlist Pro Subscription',
       m_payment_id: Date.now().toString(),
       merchant_id: PAYFAST_MERCHANT_ID,
@@ -41,6 +46,8 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       notify_url: `${BACKEND_URL}/payment/webhook`,
       return_url: `${FRONTEND_URL}/payment-success`,
     }
+
+    console.log('Payment Data:', paymentData)
 
     // Create payment record
     await Payment.findOneAndUpdate(
