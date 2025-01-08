@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const crypto = require('crypto')
 
 const { keys } = require('../../config/keys')
 const Payment = require('../../models/Payment')
@@ -12,9 +13,36 @@ const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
 const FRONTEND_URL = 'https://www.watchlistpro.site'
 const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
 
+// Add helper function for signature generation
+function generateSignature(data, passPhrase = null) {
+  // Remove signature if it exists
+  delete data.signature
+
+  // Sort keys alphabetically
+  const ordered = {}
+  Object.keys(data)
+    .sort()
+    .forEach((key) => {
+      ordered[key] = data[key]
+    })
+
+  // Add passphrase if provided
+  if (passPhrase !== null && passPhrase !== '') {
+    ordered['passphrase'] = passPhrase
+  }
+
+  // Create parameter string
+  const signString = Object.entries(ordered)
+    .map(([key, value]) => `${key}=${encodeURIComponent(value.trim())}`)
+    .join('&')
+
+  // Generate signature
+  return crypto.createHash('md5').update(signString).digest('hex')
+}
+
 router.post('/create-payment', requireAuth, async (req, res) => {
   console.log(req.body)
-  const { amountInCents, currency, productCode } = req.body
+  const { amountInCents, currency, productCode, description } = req.body
   try {
     // Validate required fields
     if (!amountInCents || !currency || !productCode) {
@@ -35,18 +63,27 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     }
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
-      amount: payfastModifiedAmount,
-      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      email_address: 'jacobscycles@gmail.com',
-      item_name: 'WatchList Pro Subscription',
-      m_payment_id: Date.now().toString(),
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
+      return_url: `${FRONTEND_URL}/payment-success`,
+      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
+      notify_url: `${BACKEND_URL}/payment/webhook`,
       name_first: req.user.firstName || 'Unknown',
       name_last: req.user.lastName || 'Unknown',
-      notify_url: `${BACKEND_URL}/payment/webhook`,
-      return_url: `${FRONTEND_URL}/payment-success`,
+      email_address: req.user.email,
+      m_payment_id: Date.now().toString(),
+      amount: payfastModifiedAmount,
+      item_name: 'WatchList Pro Subscription',
+      item_description: description || 'WatchList Pro Subscription',
+      custom_str1: productCode,
+      custom_str2: req.user._id,
+      custom_str3: currency,
+      payment_method: 'cc',
     }
+
+    // Generate signature
+    const signature = generateSignature(paymentData, keys.payfast.passPhrase)
+    paymentData.signature = signature
 
     // Create payment record
     await Payment.findOneAndUpdate(
@@ -66,6 +103,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       },
       { new: true, upsert: true }
     )
+
     res.json({
       redirectUrl: 'https://www.payfast.co.za/eng/process',
       paymentData,
