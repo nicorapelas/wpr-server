@@ -9,7 +9,7 @@ const requireAuth = require('../../middlewares/requireAuth')
 
 const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
 const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
-
+const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
 const FRONTEND_URL = 'https://www.watchlistpro.site'
 const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
 
@@ -81,8 +81,8 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       payment_method: 'cc',
     }
 
-    // Generate signature
-    const signature = generateSignature(paymentData, keys.payfast.passPhrase)
+    // Generate signature using PAYFAST_PASS_PHRASE instead of keys.payfast.passPhrase
+    const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
     paymentData.signature = signature
 
     // Create payment record
