@@ -27,7 +27,12 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         message: 'Missing required fields',
       })
     }
-
+    // Ensure we have a valid email
+    if (!req.user.email) {
+      return res.status(400).json({
+        message: 'User email is required for payment',
+      })
+    }
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
       amount: payfastModifiedAmount,
