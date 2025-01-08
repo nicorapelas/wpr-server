@@ -1,50 +1,20 @@
 const express = require('express')
 const router = express.Router()
-const axios = require('axios')
-const crypto = require('crypto')
 
 const { keys } = require('../../config/keys')
 const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
 const requireAuth = require('../../middlewares/requireAuth')
-const { log } = require('console')
 
-const PAYFAST_MERCHANT_ID = '10000100' // Sandbox merchant ID
-const PAYFAST_MERCHANT_KEY = '46f0cd694581a' // Sandbox merchant key
-const PAYFAST_PASSPHRASE = 'jt7NOE43FZPn' // Optional sandbox passphrase
-// const FRONTEND_URL = 'https://wlpsa-e99e9e05bd50.herokuapp.com'
-const FRONTEND_URL = 'https://brave-kids-scream.loca.lt'
-// const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
-const BACKEND_URL = 'https://32f7-41-13-66-157.ngrok-free.app'
-const TEST_EMAIL = 'nicorapelas@gmail.com'
+const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
+const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
 
-const generateSignature = (data) => {
-  // Remove signature and testing parameters
-  const dataToSign = { ...data }
-  delete dataToSign.signature
-  delete dataToSign.testing
-
-  // Get keys and sort them alphabetically
-  const sortedKeys = Object.keys(dataToSign).sort()
-
-  // Create parameter string with raw values (no URL encoding)
-  const pfOutput = sortedKeys
-    .map((key) => {
-      if (dataToSign[key] !== '') {
-        return `${key}=${dataToSign[key].trim()}`
-      }
-      return null
-    })
-    .filter((item) => item !== null)
-    .join('&')
-
-  return crypto.createHash('md5').update(pfOutput).digest('hex')
-}
+const FRONTEND_URL = 'https://www.watchlistpro.site/'
+const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
 
 router.post('/create-payment', requireAuth, async (req, res) => {
   console.log(req.body)
   const { amountInCents, currency, productCode } = req.body
-
   try {
     // Validate required fields
     if (!amountInCents || !currency || !productCode) {
@@ -57,29 +27,25 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         message: 'Missing required fields',
       })
     }
-
     // Ensure we have a valid email
     if (!req.user.email) {
       return res.status(400).json({
         message: 'User email is required for payment',
       })
     }
-
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
-
     const paymentData = {
       amount: payfastModifiedAmount,
       cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      email_address: 'test@test.com',
-      item_name: 'Test Product',
+      email_address: req.user.email,
+      item_name: 'Watchlist Pro Subscription',
       m_payment_id: Date.now().toString(),
-      merchant_id: '10000100',
-      merchant_key: '46f0cd694581a',
-      name_first: 'Test',
-      name_last: 'User',
+      merchant_id: PAYFAST_MERCHANT_ID,
+      merchant_key: PAYFAST_MERCHANT_KEY,
+      name_first: req.user.firstName || 'Unknown',
+      name_last: req.user.lastName || 'Unknown',
       notify_url: `${BACKEND_URL}/payment/webhook`,
       return_url: `${FRONTEND_URL}/payment-success`,
-      testing: 'true',
     }
 
     // Create payment record
@@ -100,9 +66,8 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       },
       { new: true, upsert: true }
     )
-
     res.json({
-      redirectUrl: 'https://sandbox.payfast.co.za/eng/process', // Use sandbox URL for testing
+      redirectUrl: 'https://www.payfast.co.za/eng/process',
       paymentData,
     })
   } catch (error) {
@@ -170,7 +135,6 @@ router.post('/webhook', async (req, res) => {
               `Insufficient cards available. Requested: ${cardCount}, Found: ${cards.length}`
             )
           }
-
           // Update only the specific cards found
           if (cards.length > 0) {
             const cardIds = cards.map((card) => card._id)
@@ -190,7 +154,6 @@ router.post('/webhook', async (req, res) => {
         }
         break
       }
-
       case 'FAILED':
       case 'CANCELLED': {
         const payment = await Payment.findOne({ orderId: pfData.m_payment_id })
@@ -203,7 +166,6 @@ router.post('/webhook', async (req, res) => {
         }
         break
       }
-
       default: {
         console.log(`Unhandled payment status: ${pfData.payment_status}`)
       }
