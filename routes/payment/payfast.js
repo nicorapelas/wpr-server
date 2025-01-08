@@ -92,7 +92,6 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
       // Payment options
       payment_method: 'cc',
-      subscription_type: '1', // Non-recurring payment
     }
 
     // Generate signature
