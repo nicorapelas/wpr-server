@@ -1,6 +1,5 @@
 const express = require('express')
 const router = express.Router()
-const crypto = require('crypto')
 
 const { keys } = require('../../config/keys')
 const Payment = require('../../models/Payment')
@@ -13,31 +12,7 @@ const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
 const FRONTEND_URL = 'https://www.watchlistpro.site/'
 const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
 
-// Add helper function for signature
-function generateSignature(data, passPhrase = null) {
-  // Create parameter string
-  let pfOutput = Object.keys(data)
-    .filter((key) => key !== 'signature')
-    .sort()
-    .map(
-      (key) => `${key}=${encodeURIComponent(data[key]).replace(/%20/g, '+')}`
-    )
-    .join('&')
-
-  // Add passphrase if it exists
-  if (passPhrase !== null) {
-    pfOutput = `${pfOutput}&passphrase=${encodeURIComponent(passPhrase)}`
-  }
-
-  return crypto.createHash('md5').update(pfOutput).digest('hex')
-}
-
 router.post('/create-payment', requireAuth, async (req, res) => {
-  console.log('PayFast Credentials:', {
-    merchantId: PAYFAST_MERCHANT_ID,
-    merchantKey: PAYFAST_MERCHANT_KEY,
-  })
-
   console.log(req.body)
   const { amountInCents, currency, productCode } = req.body
   try {
@@ -52,65 +27,50 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         message: 'Missing required fields',
       })
     }
+    // Ensure we have a valid email
+    if (!req.user.email) {
+      return res.status(400).json({
+        message: 'User email is required for payment',
+      })
+    }
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
-
-    // Fix URLs by removing extra slashes
-    const cancelUrl = `${FRONTEND_URL}payment-cancelled`.replace(
-      /([^:]\/)\/+/g,
-      '$1'
-    )
-    const returnUrl = `${FRONTEND_URL}payment-success`.replace(
-      /([^:]\/)\/+/g,
-      '$1'
-    )
-    const notifyUrl = `${BACKEND_URL}/payment/webhook`.replace(
-      /([^:]\/)\/+/g,
-      '$1'
-    )
-
     const paymentData = {
-      merchant_id: PAYFAST_MERCHANT_ID,
-      merchant_key: PAYFAST_MERCHANT_KEY,
-      return_url: returnUrl,
-      cancel_url: cancelUrl,
-      notify_url: notifyUrl,
-      name_first: req.user.firstName || 'Unknown',
-      name_last: req.user.lastName || 'Unknown',
-      email_address: 'jacobscycles@gmail.com',
-      m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
-      item_name: 'Watchlist Pro Subscription',
-      item_description: `Purchase of ${productCode}`,
-      custom_str1: productCode,
-      custom_str2: req.user._id?.toString() || 'unknown',
-      custom_str3: currency,
-      payment_method: 'cc',
+      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
+      email_address: 'test@test.com',
+      item_name: 'Test Product',
+      m_payment_id: Date.now().toString(),
+      merchant_id: '10000100',
+      merchant_key: '46f0cd694581a',
+      name_first: 'Test',
+      name_last: 'User',
+      notify_url: `${BACKEND_URL}/payment/webhook`,
+      return_url: `${FRONTEND_URL}/payment-success`,
+      testing: 'true',
     }
 
-    // Generate signature
-    paymentData.signature = generateSignature(paymentData)
-
-    console.log('Payment Data:', paymentData)
-
-    // Create HTML form for auto-submission
-    const formHtml = `
-      <html>
-        <body>
-          <form id="payfast-form" method="POST" action="https://www.payfast.co.za/eng/process">
-            ${Object.entries(paymentData)
-              .map(
-                ([key, value]) =>
-                  `<input type="hidden" name="${key}" value="${value}">`
-              )
-              .join('\n')}
-          </form>
-          <script>document.getElementById('payfast-form').submit();</script>
-        </body>
-      </html>
-    `
-
-    // Send the form HTML instead of JSON
-    res.send(formHtml)
+    // Create payment record
+    await Payment.findOneAndUpdate(
+      {
+        _user: req.user,
+        status: 'created',
+        productCode: productCode,
+        createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
+      },
+      {
+        $set: {
+          orderId: paymentData.m_payment_id,
+          amount: amountInCents,
+          currency: currency,
+          metadata: paymentData,
+        },
+      },
+      { new: true, upsert: true }
+    )
+    res.json({
+      redirectUrl: 'https://sandbox.payfast.co.za/eng/process', // Use sandbox URL for testing
+      paymentData,
+    })
   } catch (error) {
     console.error('Payfast Error:', error.response?.data || error.message)
     res.status(500).json({
