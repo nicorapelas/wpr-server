@@ -10,8 +10,8 @@ const requireAuth = require('../../middlewares/requireAuth')
 const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
 const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
 const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
-const FRONTEND_URL = 'https://www.watchlistpro.site'
-const BACKEND_URL = 'https://coups-1889de9f2619.herokuapp.com'
+const FRONTEND_URL = keys.payfast.frontendUrl
+const BACKEND_URL = keys.payfast.backendUrl
 
 // Add helper function for signature generation
 function generateSignature(data, passPhrase = null) {
@@ -44,6 +44,7 @@ function generateSignature(data, passPhrase = null) {
   return crypto.createHash('md5').update(signString).digest('hex')
 }
 
+// Create payment route
 router.post('/create-payment', requireAuth, async (req, res) => {
   try {
     console.log('PayFast Credentials:', {
@@ -91,6 +92,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
     // Generate signature
     const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
+    console.log('Signature:', signature)
     paymentData.signature = signature
 
     try {
