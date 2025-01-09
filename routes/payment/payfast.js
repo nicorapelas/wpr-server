@@ -49,6 +49,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     console.log('PayFast Credentials:', {
       merchantId: PAYFAST_MERCHANT_ID,
       merchantKey: PAYFAST_MERCHANT_KEY,
+      passPhrase: PAYFAST_PASS_PHRASE,
     })
 
     const { amountInCents, currency, productCode, description } = req.body
