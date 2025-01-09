@@ -13,10 +13,10 @@ const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
 const FRONTEND_URL = keys.payfast.frontendUrl
 const BACKEND_URL = keys.payfast.backendUrl
 
-// Add helper function for signature generation
+// Helper function for generating PayFast signature
 function generateSignature(data, passPhrase = null) {
   // Remove signature if it exists
-  delete data.signature
+  if ('signature' in data) delete data.signature
 
   // Sort keys alphabetically
   const ordered = {}
@@ -27,17 +27,13 @@ function generateSignature(data, passPhrase = null) {
     })
 
   // Add passphrase if provided
-  if (passPhrase !== null && passPhrase !== '') {
-    ordered['passphrase'] = passPhrase
+  if (passPhrase) {
+    ordered.passphrase = passPhrase
   }
 
   // Create parameter string
   const signString = Object.entries(ordered)
-    .map(([key, value]) => {
-      // Convert all values to strings and trim
-      const stringValue = String(value).trim()
-      return `${key}=${encodeURIComponent(stringValue)}`
-    })
+    .map(([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`)
     .join('&')
 
   // Generate signature
@@ -47,14 +43,13 @@ function generateSignature(data, passPhrase = null) {
 // Create payment route
 router.post('/create-payment', requireAuth, async (req, res) => {
   try {
+    const { amountInCents, currency, productCode, description } = req.body
+    console.log('Request Body:', req.body)
     console.log('PayFast Credentials:', {
       merchantId: PAYFAST_MERCHANT_ID,
       merchantKey: PAYFAST_MERCHANT_KEY,
       passPhrase: PAYFAST_PASS_PHRASE,
     })
-
-    const { amountInCents, currency, productCode, description } = req.body
-    console.log(req.body)
 
     // Validate required fields
     if (!amountInCents || !currency || !productCode) {
@@ -63,9 +58,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         currency,
         productCode,
       })
-      return res.status(400).json({
-        message: 'Missing required fields',
-      })
+      return res.status(400).json({ message: 'Missing required fields' })
     }
 
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
@@ -99,16 +92,16 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       // Create payment record
       await Payment.findOneAndUpdate(
         {
-          _user: req.user,
+          _user: req.user._id,
           status: 'created',
-          productCode: productCode,
+          productCode,
           createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
         },
         {
           $set: {
             orderId: paymentData.m_payment_id,
             amount: amountInCents,
-            currency: currency,
+            currency,
             metadata: paymentData,
           },
         },
@@ -116,7 +109,9 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       )
     } catch (dbError) {
       console.error('Database Error:', dbError)
-      throw new Error('Failed to create payment record')
+      return res
+        .status(500)
+        .json({ message: 'Failed to create payment record' })
     }
 
     res.json({
@@ -138,25 +133,22 @@ router.post('/create-payment', requireAuth, async (req, res) => {
   }
 })
 
-// Add body-parser raw configuration for webhook
+// Configure body-parser for webhook
 router.use('/webhook', express.raw({ type: 'application/json' }))
 
 router.post('/webhook', async (req, res) => {
   try {
-    // Parse the raw body
     const pfData =
       typeof req.body === 'string' ? JSON.parse(req.body) : req.body
 
-    // Verify payment data
     if (!pfData.payment_status || !pfData.m_payment_id) {
       return res.status(400).json({ error: 'Invalid webhook data structure' })
     }
 
-    switch (pfData.payment_status) {
-      case 'COMPLETE': {
-        // Find the payment using m_payment_id
-        const payment = await Payment.findOne({ orderId: pfData.m_payment_id })
+    const payment = await Payment.findOne({ orderId: pfData.m_payment_id })
 
+    switch (pfData.payment_status) {
+      case 'COMPLETE':
         if (payment) {
           payment.status = 'succeeded'
           payment.paymentId = pfData.pf_payment_id
@@ -171,9 +163,7 @@ router.post('/webhook', async (req, res) => {
           }
           await payment.save()
 
-          // Determine number of cards based on product code
-          let cardCount
-
+          let cardCount = 1
           switch (payment.productCode) {
             case 'WP002':
               cardCount = 5
@@ -181,21 +171,16 @@ router.post('/webhook', async (req, res) => {
             case 'WP003':
               cardCount = 10
               break
-            default: // WP001 and any other cases
-              cardCount = 1
           }
 
-          // Find and update multiple cards
           const cards = await Card.find({ status: { $ne: 'sold' } })
             .limit(cardCount)
             .exec()
-
           if (cards.length < cardCount) {
             console.warn(
               `Insufficient cards available. Requested: ${cardCount}, Found: ${cards.length}`
             )
           }
-          // Update only the specific cards found
           if (cards.length > 0) {
             const cardIds = cards.map((card) => card._id)
             await Card.updateMany(
@@ -213,11 +198,9 @@ router.post('/webhook', async (req, res) => {
           )
         }
         break
-      }
-      case 'FAILED':
-      case 'CANCELLED': {
-        const payment = await Payment.findOne({ orderId: pfData.m_payment_id })
 
+      case 'FAILED':
+      case 'CANCELLED':
         if (payment) {
           payment.status = 'failed'
           payment.errorMessage = pfData.reason || 'Payment failed'
@@ -225,25 +208,34 @@ router.post('/webhook', async (req, res) => {
           await payment.save()
         }
         break
-      }
-      default: {
+
+      default:
         console.log(`Unhandled payment status: ${pfData.payment_status}`)
-      }
     }
 
-    // Always return 200 for webhooks
     res.status(200).json({ received: true })
   } catch (error) {
-    // Still return 200 to acknowledge receipt
+    // Log error but still acknowledge receipt
+    console.error('Webhook Error:', error)
     res.status(200).json({ received: true, error: error.message })
   }
 })
 
-// Add the fetch purchase history endpoint
+// Fetch purchase history
 router.post('/fetch-purchase-history', requireAuth, async (req, res) => {
-  const { ownerId } = req.body
-  const payments = await Payment.find({ _user: ownerId })
-  res.json(payments)
+  try {
+    const { ownerId } = req.body
+    const payments = await Payment.find({ _user: ownerId })
+    res.json(payments)
+  } catch (error) {
+    console.error('Error fetching purchase history:', error)
+    res
+      .status(500)
+      .json({
+        message: 'Failed to fetch purchase history',
+        error: error.message,
+      })
+  }
 })
 
 module.exports = router
