@@ -65,20 +65,20 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     const paymentData = {
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
-      return_url: `${FRONTEND_URL}/payment-success`,
-      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      notify_url: `${BACKEND_URL}/payment/webhook`,
-      name_first: req.user.firstName || 'Unknown',
-      name_last: req.user.lastName || 'Unknown',
-      email_address: 'nicorapelas@gmail.com',
-      m_payment_id: Date.now().toString(),
+      // return_url: `${FRONTEND_URL}/payment-success`,
+      // cancel_url: `${FRONTEND_URL}/payment-cancelled`,
+      // notify_url: `${BACKEND_URL}/payment/webhook`,
+      // name_first: req.user.firstName || 'Unknown',
+      // name_last: req.user.lastName || 'Unknown',
+      // email_address: 'nicorapelas@gmail.com',
+      // m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
-      item_name: 'WatchList Pro Subscription',
-      item_description: description || 'WatchList Pro Subscription',
-      custom_str1: productCode,
-      custom_str2: req.user._id,
-      custom_str3: currency,
-      payment_method: 'cc',
+      // item_name: 'WatchList Pro Subscription',
+      // item_description: description || 'WatchList Pro Subscription',
+      // custom_str1: productCode,
+      // custom_str2: req.user._id,
+      // custom_str3: currency,
+      // payment_method: 'cc',
     }
 
     console.log('Payment Data:', paymentData)
@@ -99,7 +99,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         },
         {
           $set: {
-            orderId: paymentData.m_payment_id,
+            // orderId: paymentData.m_payment_id,
             amount: amountInCents,
             currency,
             metadata: paymentData,
@@ -141,9 +141,9 @@ router.post('/webhook', async (req, res) => {
     const pfData =
       typeof req.body === 'string' ? JSON.parse(req.body) : req.body
 
-    if (!pfData.payment_status || !pfData.m_payment_id) {
-      return res.status(400).json({ error: 'Invalid webhook data structure' })
-    }
+    // if (!pfData.payment_status || !pfData.m_payment_id) {
+    //   return res.status(400).json({ error: 'Invalid webhook data structure' })
+    // }
 
     const payment = await Payment.findOne({ orderId: pfData.m_payment_id })
 
