@@ -70,7 +70,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       notify_url: `${BACKEND_URL}/payment/webhook`,
       name_first: req.user.firstName || 'Unknown',
       name_last: req.user.lastName || 'Unknown',
-      email_address: 'jacobscycles@gmail.com',
+      email_address: 'nicorapelas@gmail.com',
       m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
       item_name: 'WatchList Pro Subscription',
@@ -229,12 +229,10 @@ router.post('/fetch-purchase-history', requireAuth, async (req, res) => {
     res.json(payments)
   } catch (error) {
     console.error('Error fetching purchase history:', error)
-    res
-      .status(500)
-      .json({
-        message: 'Failed to fetch purchase history',
-        error: error.message,
-      })
+    res.status(500).json({
+      message: 'Failed to fetch purchase history',
+      error: error.message,
+    })
   }
 })
 
