@@ -73,7 +73,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       // email_address: 'nicorapelas@gmail.com',
       // m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
-      // item_name: 'WatchList Pro Subscription',
+      item_name: 'WatchList Pro Subscription',
       // item_description: description || 'WatchList Pro Subscription',
       // custom_str1: productCode,
       // custom_str2: req.user._id,
