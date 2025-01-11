@@ -22,43 +22,40 @@ function generateSignature(data, passPhrase = null) {
     delete dataForSignature.signature
 
     // Convert to array and sort by key
-    let pairs = Object.entries(dataForSignature)
-      .filter(([_, value]) => value !== '') // Remove empty string values
-      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+    const sortedKeys = Object.keys(dataForSignature).sort()
 
-    // Build parameter string
-    let pfOutput = pairs
-      .map(([key, value]) => {
-        // Encode value according to PayFast specs
-        const encodedValue = encodeURIComponent(String(value).trim())
+    // Build parameter string exactly as PayFast does
+    let pfOutput = ''
+    sortedKeys.forEach((key, index) => {
+      if (dataForSignature[key] !== '') {
+        // Convert spaces to + and encode special characters
+        const value = dataForSignature[key]
+          .trim()
+          .replace(/ /g, '+')
           .replace(/%20/g, '+')
-          .replace(/[!'()]/g, escape)
-          .replace(/\*/g, '%2A')
-        return `${key}=${encodedValue}`
-      })
-      .join('&')
+          .replace(/[<>\"'&]/g, '')
+
+        pfOutput += `${key}=${value}`
+        if (index < sortedKeys.length - 1) {
+          pfOutput += '&'
+        }
+      }
+    })
 
     // Add passphrase if provided
     if (passPhrase !== null && passPhrase !== '') {
-      pfOutput += `&passphrase=${encodeURIComponent(passPhrase.trim())
+      pfOutput += `&passphrase=${passPhrase
+        .trim()
+        .replace(/ /g, '+')
         .replace(/%20/g, '+')
-        .replace(/[!'()]/g, escape)
-        .replace(/\*/g, '%2A')}`
+        .replace(/[<>\"'&]/g, '')}`
     }
 
-    console.log(
-      'Data for signature:',
-      JSON.stringify(dataForSignature, null, 2)
-    )
-    console.log('Sorted pairs:', JSON.stringify(pairs, null, 2))
+    console.log('Raw data:', JSON.stringify(dataForSignature, null, 2))
     console.log('Final signature string:', pfOutput)
 
-    // Generate MD5 hash
-    const signature = crypto
-      .createHash('md5')
-      .update(pfOutput)
-      .digest('hex')
-      .toLowerCase() // Ensure lowercase output
+    // Generate MD5 hash without URL encoding
+    const signature = crypto.createHash('md5').update(pfOutput).digest('hex')
 
     console.log('Generated signature:', signature)
     return signature
