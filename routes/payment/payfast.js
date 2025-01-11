@@ -32,14 +32,14 @@ function generateSignature(data) {
     .map(([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`)
     .join('&')
 
-  // Add passphrase to signature string
-  signString += `&passphrase=${encodeURIComponent(PAYFAST_PASS_PHRASE.trim())}`
+  // Add passphrase
+  signString += `&passphrase=${encodeURIComponent(PAYFAST_PASS_PHRASE)}`
 
-  console.log('Signature string:', signString)
+  console.log('Final signature string:', signString)
 
   // Generate MD5 hash
   const signature = crypto.createHash('md5').update(signString).digest('hex')
-  console.log('Generated signature:', signature)
+  console.log('Final generated signature:', signature)
 
   return signature
 }
@@ -71,23 +71,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
     console.log('Payment Data:', paymentData)
 
-    // Log the string being used for signature generation
-    const ordered = {}
-    Object.keys(paymentData)
-      .sort()
-      .forEach((key) => {
-        ordered[key] = paymentData[key]
-      })
-    const signString = Object.entries(ordered)
-      .map(
-        ([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`
-      )
-      .join('&')
-    console.log('Signature string:', signString)
-
-    // Generate signature
     const signature = generateSignature(paymentData)
-    console.log('Generated signature:', signature)
     paymentData.signature = signature
 
     const formFields = Object.entries(paymentData)
@@ -105,17 +89,8 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
     res.send(htmlForm)
   } catch (error) {
-    console.error('Payfast Error Details:', {
-      message: error.message,
-      stack: error.stack,
-      response: error.response?.data,
-    })
-
-    res.status(500).json({
-      message: 'Payment initialization failed',
-      error: error.message,
-      details: error.response?.data,
-    })
+    console.error('Payment error:', error)
+    res.status(500).json({ error: error.message })
   }
 })
 
