@@ -7,11 +7,12 @@ const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
 const requireAuth = require('../../middlewares/requireAuth')
 
-const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
-const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
-const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
-const FRONTEND_URL = keys.payfast.frontendUrl
-const BACKEND_URL = keys.payfast.backendUrl
+const PAYFAST_MERCHANT_ID = '10033543'
+const PAYFAST_MERCHANT_KEY = '34xw0ot2cjz69'
+const PAYFAST_PASS_PHRASE = 'your_sandbox_passphrase'
+const FRONTEND_URL = 'http://localhost:3000'
+const BACKEND_URL = 'http://localhost:5000'
+const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 
 // Helper function for generating PayFast signature
 function generateSignature(data, passPhrase = null) {
@@ -44,77 +45,45 @@ function generateSignature(data, passPhrase = null) {
 router.post('/create-payment', requireAuth, async (req, res) => {
   try {
     const { amountInCents, currency, productCode, description } = req.body
-    console.log('Request Body:', req.body)
-    console.log('PayFast Credentials:', {
-      merchantId: PAYFAST_MERCHANT_ID,
-      merchantKey: PAYFAST_MERCHANT_KEY,
-      passPhrase: PAYFAST_PASS_PHRASE,
-    })
-
-    // Validate required fields
-    if (!amountInCents || !currency || !productCode) {
-      console.error('Missing required fields:', {
-        amountInCents,
-        currency,
-        productCode,
-      })
-      return res.status(400).json({ message: 'Missing required fields' })
-    }
 
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
-      merchant_id: PAYFAST_MERCHANT_ID,
-      merchant_key: PAYFAST_MERCHANT_KEY,
-      return_url: `${FRONTEND_URL}/payment-success`,
+      // Use exact field structure as provided by PayFast
+      merchant_id: '10036574',
+      merchant_key: 'jnpximwns54h1',
       cancel_url: `${FRONTEND_URL}/payment-cancelled`,
+      return_url: `${FRONTEND_URL}/payment-success`,
       notify_url: `${BACKEND_URL}/payment/webhook`,
-      name_first: 'Bob',
-      name_last: 'Smith',
-      email_address: 'nicorapelas@gmail.com',
-      m_payment_id: crypto.randomUUID(),
-      amount: '100',
-      item_name: 'Test Item',
-      item_description: 'test item description',
-      custom_str1: 'payer_side',
+      name_first: req.user.firstName || 'Unknown',
+      name_last: req.user.lastName || 'Unknown',
+      email_address: req.user.email,
+      m_payment_id: Date.now().toString(),
+      amount: payfastModifiedAmount,
+      item_name: 'Test Item 001',
+      item_description: description || 'Test Item 001 description',
+      custom_str1: productCode,
+      // Remove payment_method and other non-standard fields
     }
-
-    console.log('Payment Data:', paymentData)
 
     // Generate signature
-    const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
-    console.log('Signature:', signature)
+    const signature = generateSignature(paymentData, 'happychappy')
     paymentData.signature = signature
 
-    try {
-      // Create payment record
-      await Payment.findOneAndUpdate(
-        {
-          _user: req.user._id,
-          status: 'created',
-          productCode,
-          createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
-        },
-        {
-          $set: {
-            orderId: paymentData.m_payment_id,
-            amount: amountInCents,
-            currency,
-            metadata: paymentData,
-          },
-        },
-        { new: true, upsert: true }
+    // Instead of returning JSON, return HTML form
+    const formFields = Object.entries(paymentData)
+      .map(
+        ([key, value]) => `<input type="hidden" name="${key}" value="${value}">`
       )
-    } catch (dbError) {
-      console.error('Database Error:', dbError)
-      return res
-        .status(500)
-        .json({ message: 'Failed to create payment record' })
-    }
+      .join('\n')
 
-    res.json({
-      redirectUrl: 'https://www.payfast.co.za/eng/process',
-      paymentData,
-    })
+    const htmlForm = `
+      <form id="payfast-form" action="${PAYFAST_URL}" method="post">
+        ${formFields}
+      </form>
+      <script>document.getElementById('payfast-form').submit();</script>
+    `
+
+    res.send(htmlForm)
   } catch (error) {
     console.error('Payfast Error Details:', {
       message: error.message,
