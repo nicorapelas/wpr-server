@@ -66,49 +66,37 @@ function generateSignature(data, passPhrase = null) {
 }
 
 // Create payment route
-router.post('/create-payment', requireAuth, async (req, res) => {
+router.post('/create-payment', async (req, res) => {
   try {
-    const { amountInCents, currency, productCode, description } = req.body
+    console.log('Request Body:', req.body)
 
-    const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
-      return_url: `${FRONTEND_URL}/payment-success`,
-      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
-      notify_url: `${BACKEND_URL}/payment/webhook`,
+      return_url: `${process.env.CLIENT_URL}/payment-success`,
+      cancel_url: `${process.env.CLIENT_URL}/payment-cancelled`,
+      notify_url: `${process.env.SERVER_URL}/payment/webhook`,
       name_first: 'Bob',
       name_last: 'Smith',
       email_address: 'testbuyer@example.com',
       m_payment_id: Date.now().toString(),
-      amount: payfastModifiedAmount,
+      amount: (req.body.amountInCents / 100).toFixed(2),
       item_name: 'Test Item 001',
-      item_description: description || 'Purchase of WP001',
-      custom_str1: productCode,
+      item_description: 'Test Item 001 Description ',
+      custom_str1: 'payer_side',
     }
 
-    // Generate signature
-    const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
-    paymentData.signature = signature
+    console.log('Payment Data:', paymentData)
 
-    // Create form
-    const formFields = Object.entries(paymentData)
-      .map(
-        ([key, value]) => `<input type="hidden" name="${key}" value="${value}">`
-      )
-      .join('\n')
-
-    const htmlForm = `
-      <form id="payfast-form" action="${PAYFAST_URL}" method="post">
-        ${formFields}
-      </form>
-      <script>document.getElementById('payfast-form').submit();</script>
-    `
-
-    res.send(htmlForm)
+    // Remove signature generation and just return the payment data
+    res.json({
+      success: true,
+      paymentData: paymentData,
+      paymentUrl: process.env.PAYFAST_URL,
+    })
   } catch (error) {
-    console.error('Payment error:', error)
-    res.status(500).json({ error: error.message })
+    console.error('Error creating payment:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
