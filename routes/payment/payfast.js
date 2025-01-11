@@ -27,17 +27,17 @@ function generateSignature(data, passPhrase = null) {
       ordered[key] = data[key]
     })
 
-  // Add passphrase if provided
-  if (passPhrase) {
-    ordered.passphrase = passPhrase
-  }
-
   // Create parameter string
   const signString = Object.entries(ordered)
     .map(([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`)
     .join('&')
 
-  // Generate signature
+  // Add passphrase if provided
+  if (passPhrase !== null && passPhrase !== '') {
+    signString += `&passphrase=${encodeURIComponent(passPhrase.trim())}`
+  }
+
+  // Generate MD5 hash
   return crypto.createHash('md5').update(signString).digest('hex')
 }
 
@@ -68,8 +68,23 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
     console.log('Payment Data:', paymentData)
 
+    // Log the string being used for signature generation
+    const ordered = {}
+    Object.keys(paymentData)
+      .sort()
+      .forEach((key) => {
+        ordered[key] = paymentData[key]
+      })
+    const signString = Object.entries(ordered)
+      .map(
+        ([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`
+      )
+      .join('&')
+    console.log('Signature string:', signString)
+
     // Generate signature
-    const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
+    const signature = generateSignature(paymentData)
+    console.log('Generated signature:', signature)
     paymentData.signature = signature
 
     const formFields = Object.entries(paymentData)
