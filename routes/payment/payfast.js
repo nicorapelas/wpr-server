@@ -16,46 +16,40 @@ const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 
 // Helper function for generating PayFast signature
 function generateSignature(data, passPhrase = null) {
-  // Create parameter string in exact order as specified by PayFast
-  const paramOrder = [
-    'merchant_id',
-    'merchant_key',
-    'return_url',
-    'cancel_url',
-    'notify_url',
-    'name_first',
-    'name_last',
-    'email_address',
-    'm_payment_id',
-    'amount',
-    'item_name',
-    'item_description',
-    'custom_str1',
-  ]
+  // Remove signature if it exists
+  const dataForSignature = { ...data }
+  delete dataForSignature.signature
 
-  let pfOutput = ''
-  for (const key of paramOrder) {
-    if (data.hasOwnProperty(key) && data[key] !== '') {
-      pfOutput += `${key}=${encodeURIComponent(data[key].trim()).replace(
-        /%20/g,
-        '+'
-      )}&`
-    }
-  }
+  // Sort keys alphabetically
+  const sortedKeys = Object.keys(dataForSignature).sort()
 
-  // Remove last ampersand
-  let getString = pfOutput.slice(0, -1)
+  // Build parameter string
+  const pfOutput = sortedKeys
+    .map((key) => {
+      if (dataForSignature[key] !== '') {
+        return `${key}=${encodeURIComponent(
+          dataForSignature[key].trim()
+        ).replace(/%20/g, '+')}`
+      }
+      return ''
+    })
+    .filter((item) => item) // Remove empty strings
+    .join('&')
 
   // Add passphrase if provided
-  if (passPhrase !== null) {
-    getString += `&passphrase=${encodeURIComponent(passPhrase.trim()).replace(
-      /%20/g,
-      '+'
-    )}`
-  }
+  const getString =
+    passPhrase !== null
+      ? `${pfOutput}&passphrase=${encodeURIComponent(passPhrase.trim()).replace(
+          /%20/g,
+          '+'
+        )}`
+      : pfOutput
 
-  // Generate signature
-  return crypto.createHash('md5').update(getString).digest('hex')
+  console.log('Final signature string:', getString)
+  const signature = crypto.createHash('md5').update(getString).digest('hex')
+  console.log('Final generated signature:', signature)
+
+  return signature
 }
 
 // Create payment route
