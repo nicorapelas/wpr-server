@@ -17,28 +17,32 @@ const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 // Helper function for generating PayFast signature
 function generateSignature(data) {
   // Remove signature if it exists
-  if ('signature' in data) delete data.signature
-
-  // Sort keys alphabetically
-  const ordered = {}
-  Object.keys(data)
-    .sort()
-    .forEach((key) => {
-      ordered[key] = data[key]
-    })
+  const dataForSignature = { ...data }
+  delete dataForSignature.signature
 
   // Create parameter string
-  let signString = Object.entries(ordered)
-    .map(([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`)
-    .join('&')
+  const values = Object.values(dataForSignature)
+  const keys = Object.keys(dataForSignature)
 
-  // Add passphrase
-  signString += `&passphrase=${encodeURIComponent(PAYFAST_PASS_PHRASE)}`
+  const signatureArray = []
+  keys.sort().forEach((key) => {
+    signatureArray.push(
+      `${key}=${encodeURIComponent(dataForSignature[key].trim())}`
+    )
+  })
+
+  let signString = signatureArray.join('&')
+
+  // Add passphrase if it exists
+  if (PAYFAST_PASS_PHRASE) {
+    signString += `&passphrase=${encodeURIComponent(PAYFAST_PASS_PHRASE)}`
+  }
 
   console.log('Final signature string:', signString)
 
   // Generate MD5 hash
   const signature = crypto.createHash('md5').update(signString).digest('hex')
+
   console.log('Final generated signature:', signature)
 
   return signature
@@ -48,11 +52,8 @@ function generateSignature(data) {
 router.post('/create-payment', requireAuth, async (req, res) => {
   try {
     const { amountInCents, currency, productCode, description } = req.body
-    console.log('Request Body:', req.body)
 
-    // Convert cents to Rand
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
-
     const paymentData = {
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
@@ -65,15 +66,15 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
       item_name: 'Test Item 001',
-      item_description: description || 'Test Item 001 description',
+      item_description: description || 'Purchase of WP001',
       custom_str1: productCode,
     }
 
-    console.log('Payment Data:', paymentData)
-
+    // Generate signature
     const signature = generateSignature(paymentData)
     paymentData.signature = signature
 
+    // Create form
     const formFields = Object.entries(paymentData)
       .map(
         ([key, value]) => `<input type="hidden" name="${key}" value="${value}">`
