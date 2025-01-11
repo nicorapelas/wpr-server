@@ -15,37 +15,47 @@ const BACKEND_URL = keys.payfast.backendUrl
 const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 
 // Helper function for generating PayFast signature
-function generateSignature(data) {
-  // Remove signature if it exists
-  const dataForSignature = { ...data }
-  delete dataForSignature.signature
+function generateSignature(data, passPhrase = null) {
+  // Create parameter string in exact order as specified by PayFast
+  const paramOrder = [
+    'merchant_id',
+    'merchant_key',
+    'return_url',
+    'cancel_url',
+    'notify_url',
+    'name_first',
+    'name_last',
+    'email_address',
+    'm_payment_id',
+    'amount',
+    'item_name',
+    'item_description',
+    'custom_str1',
+  ]
 
-  // Create parameter string
-  const values = Object.values(dataForSignature)
-  const keys = Object.keys(dataForSignature)
-
-  const signatureArray = []
-  keys.sort().forEach((key) => {
-    signatureArray.push(
-      `${key}=${encodeURIComponent(dataForSignature[key].trim())}`
-    )
-  })
-
-  let signString = signatureArray.join('&')
-
-  // Add passphrase if it exists
-  if (PAYFAST_PASS_PHRASE) {
-    signString += `&passphrase=${encodeURIComponent(PAYFAST_PASS_PHRASE)}`
+  let pfOutput = ''
+  for (const key of paramOrder) {
+    if (data.hasOwnProperty(key) && data[key] !== '') {
+      pfOutput += `${key}=${encodeURIComponent(data[key].trim()).replace(
+        /%20/g,
+        '+'
+      )}&`
+    }
   }
 
-  console.log('Final signature string:', signString)
+  // Remove last ampersand
+  let getString = pfOutput.slice(0, -1)
 
-  // Generate MD5 hash
-  const signature = crypto.createHash('md5').update(signString).digest('hex')
+  // Add passphrase if provided
+  if (passPhrase !== null) {
+    getString += `&passphrase=${encodeURIComponent(passPhrase.trim()).replace(
+      /%20/g,
+      '+'
+    )}`
+  }
 
-  console.log('Final generated signature:', signature)
-
-  return signature
+  // Generate signature
+  return crypto.createHash('md5').update(getString).digest('hex')
 }
 
 // Create payment route
@@ -71,7 +81,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     }
 
     // Generate signature
-    const signature = generateSignature(paymentData)
+    const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
     paymentData.signature = signature
 
     // Create form
