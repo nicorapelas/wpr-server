@@ -45,8 +45,11 @@ function generateSignature(data, passPhrase = null) {
 router.post('/create-payment', requireAuth, async (req, res) => {
   try {
     const { amountInCents, currency, productCode, description } = req.body
+    console.log('Request Body:', req.body)
 
+    // Convert cents to Rand
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
+
     const paymentData = {
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
@@ -57,11 +60,13 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       name_last: req.user.lastName || 'Unknown',
       email_address: req.user.email,
       m_payment_id: Date.now().toString(),
-      amount: payfastModifiedAmount,
+      amount: payfastModifiedAmount, // Use the converted amount
       item_name: 'Test Item 001',
       item_description: description || 'Test Item 001 description',
       custom_str1: productCode,
     }
+
+    console.log('Payment Data:', paymentData)
 
     // Generate signature
     const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
