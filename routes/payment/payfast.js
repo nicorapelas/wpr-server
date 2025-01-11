@@ -7,8 +7,8 @@ const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
 const requireAuth = require('../../middlewares/requireAuth')
 
-const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
-const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
+const PAYFAST_MERCHANT_ID = '10036574'
+const PAYFAST_MERCHANT_KEY = 'jnpximwns54h1'
 const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
 const FRONTEND_URL = keys.payfast.frontendUrl
 const BACKEND_URL = keys.payfast.backendUrl
@@ -48,11 +48,10 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
-      // Use exact field structure as provided by PayFast
-      merchant_id: '10036574',
-      merchant_key: 'jnpximwns54h1',
-      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
+      merchant_id: PAYFAST_MERCHANT_ID,
+      merchant_key: PAYFAST_MERCHANT_KEY,
       return_url: `${FRONTEND_URL}/payment-success`,
+      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
       notify_url: `${BACKEND_URL}/payment/webhook`,
       name_first: req.user.firstName || 'Unknown',
       name_last: req.user.lastName || 'Unknown',
@@ -62,14 +61,12 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       item_name: 'Test Item 001',
       item_description: description || 'Test Item 001 description',
       custom_str1: productCode,
-      // Remove payment_method and other non-standard fields
     }
 
     // Generate signature
-    const signature = generateSignature(paymentData, 'happychappy')
+    const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
     paymentData.signature = signature
 
-    // Instead of returning JSON, return HTML form
     const formFields = Object.entries(paymentData)
       .map(
         ([key, value]) => `<input type="hidden" name="${key}" value="${value}">`
