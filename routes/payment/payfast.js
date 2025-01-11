@@ -88,29 +88,12 @@ router.post('/create-payment', async (req, res) => {
 
     console.log('Payment Data:', paymentData)
 
-    // Generate HTML form for auto-submission
-    const formHtml = `
-      <html>
-        <body>
-          <form id="payfast-form" action="${
-            process.env.PAYFAST_URL
-          }" method="post">
-            ${Object.entries(paymentData)
-              .map(
-                ([key, value]) =>
-                  `<input type="hidden" name="${key}" value="${value}" />`
-              )
-              .join('\n')}
-          </form>
-          <script>
-            document.getElementById('payfast-form').submit();
-          </script>
-        </body>
-      </html>
-    `
-
-    // Send the HTML form
-    res.send(formHtml)
+    // Return the payment data and URL
+    res.json({
+      success: true,
+      paymentData,
+      paymentUrl: process.env.PAYFAST_URL,
+    })
   } catch (error) {
     console.error('Error creating payment:', error)
     res.status(500).json({ success: false, error: error.message })
