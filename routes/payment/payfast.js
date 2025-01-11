@@ -58,7 +58,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       notify_url: `${BACKEND_URL}/payment/webhook`,
       name_first: 'Bob',
       name_last: 'Smith',
-      email_address: 'bobsmith@mail.com',
+      email_address: 'testbuyer@example.com',
       m_payment_id: Date.now().toString(),
       amount: payfastModifiedAmount,
       item_name: 'Test Item 001',
