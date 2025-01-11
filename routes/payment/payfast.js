@@ -7,96 +7,129 @@ const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
 const requireAuth = require('../../middlewares/requireAuth')
 
-const PAYFAST_MERCHANT_ID = '10036574'
-const PAYFAST_MERCHANT_KEY = 'jnpximwns54h1'
-const PAYFAST_PASS_PHRASE = 'happychappy'
+const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
+const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
+const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
 const FRONTEND_URL = keys.payfast.frontendUrl
 const BACKEND_URL = keys.payfast.backendUrl
-const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 
 // Helper function for generating PayFast signature
 function generateSignature(data, passPhrase = null) {
-  try {
-    // Remove signature if it exists
-    const dataForSignature = { ...data }
-    delete dataForSignature.signature
+  // Remove signature if it exists
+  if ('signature' in data) delete data.signature
 
-    // Convert to array and sort by key
-    const sortedKeys = Object.keys(dataForSignature).sort()
-
-    // Build parameter string exactly as PayFast does
-    let pfOutput = ''
-    sortedKeys.forEach((key, index) => {
-      if (dataForSignature[key] !== '') {
-        // Convert spaces to + and encode special characters
-        const value = dataForSignature[key]
-          .trim()
-          .replace(/ /g, '+')
-          .replace(/%20/g, '+')
-          .replace(/[<>\"'&]/g, '')
-
-        pfOutput += `${key}=${value}`
-        if (index < sortedKeys.length - 1) {
-          pfOutput += '&'
-        }
-      }
+  // Sort keys alphabetically
+  const ordered = {}
+  Object.keys(data)
+    .sort()
+    .forEach((key) => {
+      ordered[key] = data[key]
     })
 
-    // Add passphrase if provided
-    if (passPhrase !== null && passPhrase !== '') {
-      pfOutput += `&passphrase=${passPhrase
-        .trim()
-        .replace(/ /g, '+')
-        .replace(/%20/g, '+')
-        .replace(/[<>\"'&]/g, '')}`
-    }
-
-    console.log('Raw data:', JSON.stringify(dataForSignature, null, 2))
-    console.log('Final signature string:', pfOutput)
-
-    // Generate MD5 hash without URL encoding
-    const signature = crypto.createHash('md5').update(pfOutput).digest('hex')
-
-    console.log('Generated signature:', signature)
-    return signature
-  } catch (error) {
-    console.error('Error in generateSignature:', error)
-    throw error
+  // Add passphrase if provided
+  if (passPhrase) {
+    ordered.passphrase = passPhrase
   }
+
+  // Create parameter string
+  const signString = Object.entries(ordered)
+    .map(([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`)
+    .join('&')
+
+  // Generate signature
+  return crypto.createHash('md5').update(signString).digest('hex')
 }
 
 // Create payment route
-router.post('/create-payment', async (req, res) => {
+router.post('/create-payment', requireAuth, async (req, res) => {
   try {
+    const { amountInCents, currency, productCode, description } = req.body
     console.log('Request Body:', req.body)
+    console.log('PayFast Credentials:', {
+      merchantId: PAYFAST_MERCHANT_ID,
+      merchantKey: PAYFAST_MERCHANT_KEY,
+      passPhrase: PAYFAST_PASS_PHRASE,
+    })
 
+    // Validate required fields
+    if (!amountInCents || !currency || !productCode) {
+      console.error('Missing required fields:', {
+        amountInCents,
+        currency,
+        productCode,
+      })
+      return res.status(400).json({ message: 'Missing required fields' })
+    }
+
+    const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
-      merchant_id: process.env.PAYFAST_MERCHANT_ID,
-      merchant_key: process.env.PAYFAST_MERCHANT_KEY,
-      return_url: `${process.env.CLIENT_URL}/payment-success`,
-      cancel_url: `${process.env.CLIENT_URL}/payment-cancelled`,
-      notify_url: `${process.env.SERVER_URL}/payment/webhook`,
-      name_first: 'Bob',
-      name_last: 'Smith',
-      email_address: 'testbuyer@example.com',
+      merchant_id: PAYFAST_MERCHANT_ID,
+      merchant_key: PAYFAST_MERCHANT_KEY,
+      return_url: `${FRONTEND_URL}/payment-success`,
+      cancel_url: `${FRONTEND_URL}/payment-cancelled`,
+      notify_url: `${BACKEND_URL}/payment/webhook`,
+      name_first: req.user.firstName || 'Unknown',
+      name_last: req.user.lastName || 'Unknown',
+      email_address: 'nicorapelas@gmail.com',
       m_payment_id: Date.now().toString(),
-      amount: (req.body.amountInCents / 100).toFixed(2),
-      item_name: 'Test Item 001',
-      item_description: req.body.description,
-      custom_str1: req.body.productCode,
+      amount: payfastModifiedAmount,
+      item_name: 'WatchList Pro Subscription',
+      item_description: description || 'WatchList Pro Subscription',
+      custom_str1: productCode,
+      custom_str2: req.user._id,
+      custom_str3: currency,
+      payment_method: 'cc',
     }
 
     console.log('Payment Data:', paymentData)
 
-    // Return the payment data and URL
+    // Generate signature
+    const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
+    console.log('Signature:', signature)
+    paymentData.signature = signature
+
+    try {
+      // Create payment record
+      await Payment.findOneAndUpdate(
+        {
+          _user: req.user._id,
+          status: 'created',
+          productCode,
+          createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
+        },
+        {
+          $set: {
+            orderId: paymentData.m_payment_id,
+            amount: amountInCents,
+            currency,
+            metadata: paymentData,
+          },
+        },
+        { new: true, upsert: true }
+      )
+    } catch (dbError) {
+      console.error('Database Error:', dbError)
+      return res
+        .status(500)
+        .json({ message: 'Failed to create payment record' })
+    }
+
     res.json({
-      success: true,
+      redirectUrl: 'https://www.payfast.co.za/eng/process',
       paymentData,
-      paymentUrl: process.env.PAYFAST_URL,
     })
   } catch (error) {
-    console.error('Error creating payment:', error)
-    res.status(500).json({ success: false, error: error.message })
+    console.error('Payfast Error Details:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+    })
+
+    res.status(500).json({
+      message: 'Payment initialization failed',
+      error: error.message,
+      details: error.response?.data,
+    })
   }
 })
 
