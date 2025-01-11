@@ -71,8 +71,8 @@ router.post('/create-payment', async (req, res) => {
     console.log('Request Body:', req.body)
 
     const paymentData = {
-      merchant_id: PAYFAST_MERCHANT_ID,
-      merchant_key: PAYFAST_MERCHANT_KEY,
+      merchant_id: process.env.PAYFAST_MERCHANT_ID,
+      merchant_key: process.env.PAYFAST_MERCHANT_KEY,
       return_url: `${process.env.CLIENT_URL}/payment-success`,
       cancel_url: `${process.env.CLIENT_URL}/payment-cancelled`,
       notify_url: `${process.env.SERVER_URL}/payment/webhook`,
@@ -82,18 +82,35 @@ router.post('/create-payment', async (req, res) => {
       m_payment_id: Date.now().toString(),
       amount: (req.body.amountInCents / 100).toFixed(2),
       item_name: 'Test Item 001',
-      item_description: 'Test Item 001 Description ',
-      custom_str1: 'payer_side',
+      item_description: req.body.description,
+      custom_str1: req.body.productCode,
     }
 
     console.log('Payment Data:', paymentData)
 
-    // Remove signature generation and just return the payment data
-    res.json({
-      success: true,
-      paymentData: paymentData,
-      paymentUrl: process.env.PAYFAST_URL,
-    })
+    // Generate HTML form for auto-submission
+    const formHtml = `
+      <html>
+        <body>
+          <form id="payfast-form" action="${
+            process.env.PAYFAST_URL
+          }" method="post">
+            ${Object.entries(paymentData)
+              .map(
+                ([key, value]) =>
+                  `<input type="hidden" name="${key}" value="${value}" />`
+              )
+              .join('\n')}
+          </form>
+          <script>
+            document.getElementById('payfast-form').submit();
+          </script>
+        </body>
+      </html>
+    `
+
+    // Send the HTML form
+    res.send(formHtml)
   } catch (error) {
     console.error('Error creating payment:', error)
     res.status(500).json({ success: false, error: error.message })
