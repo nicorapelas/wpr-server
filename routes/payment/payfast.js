@@ -57,7 +57,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         amountInCents,
         currency,
         productCode,
-      })paymentData
+      })
       return res.status(400).json({ message: 'Missing required fields' })
     }
 
