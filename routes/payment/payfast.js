@@ -7,11 +7,11 @@ const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
 const requireAuth = require('../../middlewares/requireAuth')
 
-const PAYFAST_MERCHANT_ID = '10033543'
-const PAYFAST_MERCHANT_KEY = '34xw0ot2cjz69'
-const PAYFAST_PASS_PHRASE = 'your_sandbox_passphrase'
-const FRONTEND_URL = 'http://localhost:3000'
-const BACKEND_URL = 'http://localhost:5000'
+const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
+const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
+const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
+const FRONTEND_URL = keys.payfast.frontendUrl
+const BACKEND_URL = keys.payfast.backendUrl
 const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 
 // Helper function for generating PayFast signature
