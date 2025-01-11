@@ -71,7 +71,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       name_first: 'Bob',
       name_last: 'Smith',
       email_address: 'nicorapelas@gmail.com',
-      m_payment_id: '12345678',
+      m_payment_id: crypto.randomUUID(),
       amount: '100',
       item_name: 'Test Item',
       item_description: 'test item description',
