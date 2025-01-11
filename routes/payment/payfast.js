@@ -76,6 +76,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       item_name: 'Test Item',
       item_description: 'test item description',
       custom_str1: 'payer_side',
+      testing: 'true',
     }
 
     console.log('Payment Data:', paymentData)
