@@ -63,8 +63,8 @@ router.post('/create-payment', requireAuth, async (req, res) => {
 
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
     const paymentData = {
-      merchant_id: '10033543',
-      merchant_key: '34xw0ot2cjz69',
+      merchant_id: PAYFAST_MERCHANT_ID,
+      merchant_key: PAYFAST_MERCHANT_KEY,
       return_url: `${FRONTEND_URL}/payment-success`,
       cancel_url: `${FRONTEND_URL}/payment-cancelled`,
       notify_url: `${BACKEND_URL}/payment/webhook`,
@@ -76,7 +76,6 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       item_name: 'Test Item',
       item_description: 'test item description',
       custom_str1: 'payer_side',
-      testing: 'true',
     }
 
     console.log('Payment Data:', paymentData)
