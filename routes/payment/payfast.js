@@ -9,13 +9,13 @@ const requireAuth = require('../../middlewares/requireAuth')
 
 const PAYFAST_MERCHANT_ID = '10036574'
 const PAYFAST_MERCHANT_KEY = 'jnpximwns54h1'
-const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
+const PAYFAST_PASS_PHRASE = 'happychappy'
 const FRONTEND_URL = keys.payfast.frontendUrl
 const BACKEND_URL = keys.payfast.backendUrl
 const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 
 // Helper function for generating PayFast signature
-function generateSignature(data, passPhrase = null) {
+function generateSignature(data) {
   // Remove signature if it exists
   if ('signature' in data) delete data.signature
 
@@ -28,17 +28,20 @@ function generateSignature(data, passPhrase = null) {
     })
 
   // Create parameter string
-  const signString = Object.entries(ordered)
+  let signString = Object.entries(ordered)
     .map(([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`)
     .join('&')
 
-  // Add passphrase if provided
-  if (passPhrase !== null && passPhrase !== '') {
-    signString += `&passphrase=${encodeURIComponent(passPhrase.trim())}`
-  }
+  // Add passphrase to signature string
+  signString += `&passphrase=${encodeURIComponent(PAYFAST_PASS_PHRASE.trim())}`
+
+  console.log('Signature string:', signString)
 
   // Generate MD5 hash
-  return crypto.createHash('md5').update(signString).digest('hex')
+  const signature = crypto.createHash('md5').update(signString).digest('hex')
+  console.log('Generated signature:', signature)
+
+  return signature
 }
 
 // Create payment route
