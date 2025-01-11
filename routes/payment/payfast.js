@@ -16,40 +16,56 @@ const PAYFAST_URL = 'https://sandbox.payfast.co.za/eng/process'
 
 // Helper function for generating PayFast signature
 function generateSignature(data, passPhrase = null) {
-  // Remove signature if it exists
-  const dataForSignature = { ...data }
-  delete dataForSignature.signature
+  try {
+    // Remove signature if it exists
+    const dataForSignature = { ...data }
+    delete dataForSignature.signature
 
-  // Sort keys alphabetically
-  const sortedKeys = Object.keys(dataForSignature).sort()
+    // Convert to array and sort by key
+    let pairs = Object.entries(dataForSignature)
+      .filter(([_, value]) => value !== '') // Remove empty string values
+      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
 
-  // Build parameter string
-  const pfOutput = sortedKeys
-    .map((key) => {
-      if (dataForSignature[key] !== '') {
-        return `${key}=${encodeURIComponent(
-          dataForSignature[key].trim()
-        ).replace(/%20/g, '+')}`
-      }
-      return ''
-    })
-    .filter((item) => item) // Remove empty strings
-    .join('&')
+    // Build parameter string
+    let pfOutput = pairs
+      .map(([key, value]) => {
+        // Encode value according to PayFast specs
+        const encodedValue = encodeURIComponent(String(value).trim())
+          .replace(/%20/g, '+')
+          .replace(/[!'()]/g, escape)
+          .replace(/\*/g, '%2A')
+        return `${key}=${encodedValue}`
+      })
+      .join('&')
 
-  // Add passphrase if provided
-  const getString =
-    passPhrase !== null
-      ? `${pfOutput}&passphrase=${encodeURIComponent(passPhrase.trim()).replace(
-          /%20/g,
-          '+'
-        )}`
-      : pfOutput
+    // Add passphrase if provided
+    if (passPhrase !== null && passPhrase !== '') {
+      pfOutput += `&passphrase=${encodeURIComponent(passPhrase.trim())
+        .replace(/%20/g, '+')
+        .replace(/[!'()]/g, escape)
+        .replace(/\*/g, '%2A')}`
+    }
 
-  console.log('Final signature string:', getString)
-  const signature = crypto.createHash('md5').update(getString).digest('hex')
-  console.log('Final generated signature:', signature)
+    console.log(
+      'Data for signature:',
+      JSON.stringify(dataForSignature, null, 2)
+    )
+    console.log('Sorted pairs:', JSON.stringify(pairs, null, 2))
+    console.log('Final signature string:', pfOutput)
 
-  return signature
+    // Generate MD5 hash
+    const signature = crypto
+      .createHash('md5')
+      .update(pfOutput)
+      .digest('hex')
+      .toLowerCase() // Ensure lowercase output
+
+    console.log('Generated signature:', signature)
+    return signature
+  } catch (error) {
+    console.error('Error in generateSignature:', error)
+    throw error
+  }
 }
 
 // Create payment route
