@@ -51,7 +51,6 @@ router.get('/fetch-user', requireAuth, (req, res) => {
 // @desc   Register a user and respond with JWT
 // @access public
 router.post('/register', async (req, res) => {
-  console.log(`req.body`, req.body)
   // Validation check
   // Check if User exists
   const userCheck = await User.findOne({ email: req.body.email })
@@ -86,7 +85,8 @@ router.post('/register', async (req, res) => {
 // @desc   Login a user and respond with JWT
 // @access public
 router.post('/login', async (req, res) => {
-  console.log(`AT LOGIN ROUTE:`, req.body)
+  console.log(`@ Login route:`, req.body)
+
   // Validation check
   const errors = {}
   const { email, password } = req.body
@@ -134,7 +134,6 @@ router.post(
   '/login-web',
   passport.authenticate('local', { session: false }),
   (req, res) => {
-    console.log(`AT LOGIN ROUTE..!:`, req.body)
     if (req.isAuthenticated()) {
       const { _id, username, role } = req.user
       const token = signToken(_id)

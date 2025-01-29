@@ -1,18 +1,23 @@
 const express = require('express')
 const router = express.Router()
 const axios = require('axios')
+const mongoose = require('mongoose')
 
 const { keys } = require('../../config/keys')
 const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
+const CardOwed = require('../../models/CardOwed')
+const User = mongoose.model('User')
 const requireAuth = require('../../middlewares/requireAuth')
 
 const YOCO_SECRET_KEY = keys.yoco.secretKey
 const YOCO_API_URL = keys.yoco.apiUrl
 const FRONTEND_URL = keys.yoco.frontendUrl
+const BACKEND_URL = keys.yoco.backendUrl
 
 router.post('/create-payment', requireAuth, async (req, res) => {
   const { amountInCents, currency, description, productCode } = req.body
+
   try {
     const checkoutData = {
       amount: amountInCents,
@@ -88,19 +93,16 @@ router.use('/webhook', express.raw({ type: 'application/json' }))
 router.post('/webhook', async (req, res) => {
   try {
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-    console.log('Webhook event:', event)
 
     if (!event.type || !event.payload) {
       return res.status(400).json({ error: 'Invalid webhook data structure' })
     }
 
     const { payload } = event
-    // Find payment using order_id from metadata (similar to PayFast's m_payment_id)
     const payment = await Payment.findOne({
       orderId: payload.metadata.order_id,
     })
 
-    // Map Yoco status to our internal status (similar to PayFast)
     switch (event.type) {
       case 'payment.succeeded':
         if (payment) {
@@ -132,9 +134,15 @@ router.post('/webhook', async (req, res) => {
             .exec()
 
           if (cards.length < cardCount) {
+            console.log(cards.length)
+            console.log(cardCount)
             console.warn(
               `Insufficient cards available. Requested: ${cardCount}, Found: ${cards.length}`
             )
+            await CardOwed.create({
+              owedTo: payment._user,
+              numberOfCards: cardCount,
+            })
           }
 
           if (cards.length > 0) {
@@ -176,9 +184,28 @@ router.post('/webhook', async (req, res) => {
 })
 
 router.post('/fetch-purchase-history', requireAuth, async (req, res) => {
-  const { ownerId } = req.body
-  const payments = await Payment.find({ _user: ownerId })
+  try {
+    const { ownerId } = req.body
+    const payments = await Payment.find({ _user: ownerId })
+    res.json(payments)
+  } catch (error) {
+    console.error('Error fetching purchase history:', error)
+    res.status(500).json({
+      message: 'Failed to fetch purchase history',
+      error: error.message,
+    })
+  }
+})
+
+router.get('/fetch-all-payments', requireAuth, async (req, res) => {
+  const payments = await Payment.find({})
   res.json(payments)
+})
+
+router.post('/fetch-user-of-payment', requireAuth, async (req, res) => {
+  const { userId } = req.body
+  const user = await User.findById(userId)
+  res.json(user)
 })
 
 module.exports = router

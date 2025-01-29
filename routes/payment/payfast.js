@@ -1,95 +1,151 @@
 const express = require('express')
 const router = express.Router()
 const crypto = require('crypto')
+const payfast = require('@payfast/core')
 
 const { keys } = require('../../config/keys')
 const Payment = require('../../models/Payment')
 const Card = require('../../models/Card')
 const requireAuth = require('../../middlewares/requireAuth')
 
-const PAYFAST_MERCHANT_ID = keys.payfast.merchantId
-const PAYFAST_MERCHANT_KEY = keys.payfast.merchantKey
-const PAYFAST_PASS_PHRASE = keys.payfast.passPhrase
+const PAYFAST_MERCHANT_ID = '10036591'
+const PAYFAST_MERCHANT_KEY = 'q9xcwypuj3aed'
+const PAYFAST_PASS_PHRASE = 'happyChappy123'
 const FRONTEND_URL = keys.payfast.frontendUrl
 const BACKEND_URL = keys.payfast.backendUrl
 
-// Helper function for generating PayFast signature
-function generateSignature(data, passPhrase = null) {
-  // Remove signature if it exists
-  if ('signature' in data) delete data.signature
+// Define the field order at the top level so both functions can use it
+const PAYFAST_FIELD_ORDER = [
+  'merchant_id',
+  'merchant_key',
+  'return_url',
+  'cancel_url',
+  'notify_url',
+  'name_first',
+  'name_last',
+  'email_address',
+  'm_payment_id',
+  'amount',
+  'item_name',
+  'item_description',
+  'custom_str1',
+]
 
-  // Sort keys alphabetically
-  const ordered = {}
-  Object.keys(data)
-    .sort()
-    .forEach((key) => {
-      ordered[key] = data[key]
-    })
+// Add this debug function
+function debugPaymentData(data, hideSignature = false) {
+  // Create a copy to avoid modifying original data
+  const debugData = { ...data }
 
-  // Add passphrase if provided
-  if (passPhrase) {
-    ordered.passphrase = passPhrase
+  // Always hide sensitive data
+  if (debugData.merchant_key) debugData.merchant_key = '***'
+  if (debugData.passphrase) debugData.passphrase = '***'
+
+  // Optionally hide signature
+  if (hideSignature && debugData.signature) {
+    delete debugData.signature
   }
 
-  // Create parameter string
-  const signString = Object.entries(ordered)
-    .map(([key, value]) => `${key}=${encodeURIComponent(String(value).trim())}`)
-    .join('&')
+  return debugData
+}
 
-  // Generate signature
-  return crypto.createHash('md5').update(signString).digest('hex')
+function generateSignature(data, passPhrase) {
+  const stringParts = [
+    `merchant_id=${data.merchant_id}`,
+    `merchant_key=${data.merchant_key}`,
+    `return_url=${encodeURIComponent(data.return_url)}`,
+    `cancel_url=${encodeURIComponent(data.cancel_url)}`,
+    `notify_url=${encodeURIComponent(data.notify_url)}`,
+    `name_first=${data.name_first}`,
+    `name_last=${data.name_last}`,
+    `email_address=${encodeURIComponent(data.email_address)}`,
+    `m_payment_id=${data.m_payment_id}`,
+    `amount=${data.amount}`,
+    `item_name=${data.item_name}`,
+    `item_description=${data.item_description}`,
+    `custom_str1=${data.custom_str1}`,
+  ]
+
+  // Add passphrase without URL encoding
+  if (passPhrase) {
+    stringParts.push(`passphrase=${passPhrase}`)
+  }
+
+  const pfOutput = stringParts.join('&')
+  console.log('=== Signature Generation Debug ===')
+  console.log('Individual Parts:')
+  stringParts.forEach((part) => console.log(part))
+  console.log('\nFinal string to hash:', pfOutput)
+  const signature = crypto.createHash('md5').update(pfOutput).digest('hex')
+  console.log('Generated signature:', signature)
+  console.log('===============================')
+
+  return signature
+}
+
+// Add this function to generate the query string
+function generateQueryString(data) {
+  const stringParts = PAYFAST_FIELD_ORDER.map(
+    (field) => `${field}=${encodeURIComponent(data[field])}`
+  )
+
+  // Add passphrase with URL encoding if it exists
+  if (data.passphrase) {
+    stringParts.push(`passphrase=${encodeURIComponent(data.passphrase)}`)
+  }
+
+  return stringParts.join('&')
+}
+
+function generateUniquePaymentId() {
+  const timestamp = Date.now()
+  const random = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')
+  return `${timestamp}${random}`
 }
 
 // Create payment route
 router.post('/create-payment', requireAuth, async (req, res) => {
   try {
-    const { amountInCents, currency, productCode, description } = req.body
-    console.log('Request Body:', req.body)
-    console.log('PayFast Credentials:', {
-      merchantId: PAYFAST_MERCHANT_ID,
-      merchantKey: PAYFAST_MERCHANT_KEY,
-      passPhrase: PAYFAST_PASS_PHRASE,
-    })
+    const { amountInCents, currency, productCode } = req.body
 
-    // Validate required fields
     if (!amountInCents || !currency || !productCode) {
-      console.error('Missing required fields:', {
-        amountInCents,
-        currency,
-        productCode,
-      })
       return res.status(400).json({ message: 'Missing required fields' })
     }
 
     const payfastModifiedAmount = (amountInCents / 100).toFixed(2)
+
     const paymentData = {
       merchant_id: PAYFAST_MERCHANT_ID,
       merchant_key: PAYFAST_MERCHANT_KEY,
       return_url: `${FRONTEND_URL}/payment-success`,
       cancel_url: `${FRONTEND_URL}/payment-cancelled`,
       notify_url: `${BACKEND_URL}/payment/webhook`,
-      name_first: req.user.firstName || 'Unknown',
-      name_last: req.user.lastName || 'Unknown',
-      email_address: 'nicorapelas@gmail.com',
-      m_payment_id: Date.now().toString(),
+      name_first: 'Test',
+      name_last: 'User',
+      email_address: 'faghmeea@payfast.io',
+      m_payment_id: generateUniquePaymentId(),
       amount: payfastModifiedAmount,
-      item_name: 'WatchList Pro Subscription',
-      item_description: description || 'WatchList Pro Subscription',
+      item_name: 'WatchList Pro',
+      item_description: 'WatchList Pro Subscription',
       custom_str1: productCode,
-      custom_str2: req.user._id,
-      custom_str3: currency,
-      payment_method: 'cc',
+      passphrase: PAYFAST_PASS_PHRASE,
     }
 
-    console.log('Payment Data:', paymentData)
+    console.log('Payment Data before signature:', debugPaymentData(paymentData))
 
     // Generate signature
     const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
-    console.log('Signature:', signature)
+    console.log('Generated signature:', signature)
+
     paymentData.signature = signature
+    console.log('Final Payment Data:', debugPaymentData(paymentData, true))
+
+    // Create query string
+    const queryString = generateQueryString(paymentData)
+    console.log('Full query string being sent:', queryString)
 
     try {
-      // Create payment record
       await Payment.findOneAndUpdate(
         {
           _user: req.user._id,
@@ -115,20 +171,14 @@ router.post('/create-payment', requireAuth, async (req, res) => {
     }
 
     res.json({
-      redirectUrl: 'https://www.payfast.co.za/eng/process',
+      redirectUrl: 'https://sandbox.payfast.co.za/eng/process',
       paymentData,
     })
   } catch (error) {
-    console.error('Payfast Error Details:', {
-      message: error.message,
-      stack: error.stack,
-      response: error.response?.data,
-    })
-
+    console.error('Payment Error:', error)
     res.status(500).json({
       message: 'Payment initialization failed',
       error: error.message,
-      details: error.response?.data,
     })
   }
 })
