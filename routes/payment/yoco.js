@@ -15,6 +15,8 @@ const YOCO_API_URL = keys.yoco.apiUrl
 const FRONTEND_URL = keys.yoco.frontendUrl
 const BACKEND_URL = keys.yoco.backendUrl
 
+console.log(`YOCO_API_URL`, YOCO_API_URL)
+
 router.post('/create-payment', requireAuth, async (req, res) => {
   const { amountInCents, currency, description, productCode } = req.body
 
