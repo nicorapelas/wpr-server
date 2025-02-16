@@ -104,11 +104,7 @@ router.get('/fetch-user-cards', requireAuth, async (req, res) => {
 // Admin route
 router.post('/fetch-card-owner', async (req, res) => {
   const { ownerId } = req.body
-  console.log(req.body)
-
   const owner = await User.findById({ _id: ownerId })
-  console.log(`owner:`, owner)
-
   res.json(owner)
 })
 

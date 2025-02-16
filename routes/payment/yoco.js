@@ -15,8 +15,6 @@ const YOCO_API_URL = keys.yoco.apiUrl
 const FRONTEND_URL = keys.yoco.frontendUrl
 const BACKEND_URL = keys.yoco.backendUrl
 
-console.log('yoco public key', keys.yoco.publicKey)
-
 router.post('/create-payment', requireAuth, async (req, res) => {
   const { amountInCents, currency, description, productCode } = req.body
 
@@ -80,6 +78,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       },
       { new: true, upsert: true }
     )
+
     res.json(response.data)
   } catch (error) {
     console.error('Yoco Error:', error.response?.data || error.message)
@@ -136,8 +135,6 @@ router.post('/webhook', async (req, res) => {
             .exec()
 
           if (cards.length < cardCount) {
-            console.log(cards.length)
-            console.log(cardCount)
             console.warn(
               `Insufficient cards available. Requested: ${cardCount}, Found: ${cards.length}`
             )
@@ -149,6 +146,7 @@ router.post('/webhook', async (req, res) => {
 
           if (cards.length > 0) {
             const cardIds = cards.map((card) => card._id)
+
             await Card.updateMany(
               { _id: { $in: cardIds } },
               {

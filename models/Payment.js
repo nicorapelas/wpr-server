@@ -4,41 +4,41 @@ const Schema = mongoose.Schema
 const PaymentSchema = new Schema({
   _user: {
     type: Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
   },
   orderId: {
     type: String,
     unique: true,
-    sparse: true
+    sparse: true,
   },
   amount: {
     type: Number,
-    required: true
+    required: true,
   },
   currency: {
     type: String,
-    required: true
+    required: true,
   },
   status: {
     type: String,
     enum: ['created', 'succeeded', 'failed'],
-    default: 'created'
+    default: 'created',
   },
   productCode: {
     type: String,
-    required: true
+    required: true,
   },
   paymentId: String,
   metadata: Object,
   errorMessage: String,
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 })
 
 module.exports = mongoose.model('Payment', PaymentSchema)

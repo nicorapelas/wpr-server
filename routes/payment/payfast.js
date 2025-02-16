@@ -71,13 +71,8 @@ function generateSignature(data, passPhrase) {
   }
 
   const pfOutput = stringParts.join('&')
-  console.log('=== Signature Generation Debug ===')
-  console.log('Individual Parts:')
   stringParts.forEach((part) => console.log(part))
-  console.log('\nFinal string to hash:', pfOutput)
   const signature = crypto.createHash('md5').update(pfOutput).digest('hex')
-  console.log('Generated signature:', signature)
-  console.log('===============================')
 
   return signature
 }
@@ -132,18 +127,13 @@ router.post('/create-payment', requireAuth, async (req, res) => {
       passphrase: PAYFAST_PASS_PHRASE,
     }
 
-    console.log('Payment Data before signature:', debugPaymentData(paymentData))
-
     // Generate signature
     const signature = generateSignature(paymentData, PAYFAST_PASS_PHRASE)
-    console.log('Generated signature:', signature)
 
     paymentData.signature = signature
-    console.log('Final Payment Data:', debugPaymentData(paymentData, true))
-
+\
     // Create query string
     const queryString = generateQueryString(paymentData)
-    console.log('Full query string being sent:', queryString)
 
     try {
       await Payment.findOneAndUpdate(
