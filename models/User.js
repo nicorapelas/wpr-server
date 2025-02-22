@@ -6,8 +6,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  phone: {
+    type: String,
+  },
   email: {
     type: String,
+    required: true,
   },
   password: {
     type: String,
@@ -15,6 +19,10 @@ const userSchema = new mongoose.Schema({
   emailVerified: {
     type: Boolean,
     default: true,
+  },
+  passwordUpdated: {
+    type: Boolean,
+    default: false,
   },
   resetPasswordToken: {
     type: String,

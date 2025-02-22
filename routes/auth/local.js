@@ -54,24 +54,23 @@ router.post('/register', async (req, res) => {
   // Validation check
   // Check if User exists
   const userCheck = await User.findOne({ email: req.body.email })
-  console.log(`userCheck`, userCheck)
   if (userCheck) {
     errors.email = 'Email already in use'
     res.json({ error: errors })
     return
   }
-  const { email, password } = req.body
+  const { email, phone, password } = req.body
   try {
     // Create user
     const newUser = new User({
       username: email,
       email,
+      phone,
       password,
       localId: true,
       created: Date.now(),
     })
     // Send verification email
-    console.log(`newUser`, newUser)
     await newUser.save()
     return res.send({
       success: `An 'email verification' email has been sent to you. Please open the email and follow the provided instructions.`,
@@ -85,8 +84,6 @@ router.post('/register', async (req, res) => {
 // @desc   Login a user and respond with JWT
 // @access public
 router.post('/login', async (req, res) => {
-  console.log(`@ Login route:`, req.body)
-
   // Validation check
   const errors = {}
   const { email, password } = req.body
@@ -107,7 +104,6 @@ router.post('/login', async (req, res) => {
   try {
     await user.comparePassword(password)
     const token = jwt.sign({ userId: user._id }, keys.JWT.secret)
-    console.log('token', token)
     res.json({ token })
   } catch (err) {
     errors.password = 'Invalid username or password'
@@ -142,5 +138,56 @@ router.post(
     }
   }
 )
+
+// @route  POST /auth/user/reset-password
+// @desc   Reset password
+// @access public
+router.post('/reset-password', async (req, res) => {
+  const { username, phone, password } = req.body
+  try {
+    // Create a query object based on provided credentials
+    const searchQuery = {}
+    if (username) {
+      searchQuery.username = username
+    } else if (phone) {
+      searchQuery.phone = phone
+    } else {
+      return res
+        .status(400)
+        .json({ error: 'Username or phone number is required' })
+    }
+    const user = await User.findOne(searchQuery)
+    if (!user) {
+      return res.json({ error: 'User not found' })
+    }
+    user.password = password
+    user.passwordUpdated = false
+    await user.save()
+    res.json({ success: true, message: 'Password updated successfully' })
+  } catch (err) {
+    console.error('Password reset error:', err)
+    res.status(500).json({ error: 'Server error during password reset' })
+  }
+})
+
+// @route  POST /auth/user/update-password
+// @desc   Update password
+// @access public
+router.post('/update-password', async (req, res) => {
+  const { username, password } = req.body
+  try {
+    const user = await User.findOne({ username })
+    if (!user) {
+      return res.json({ error: 'User not found' })
+    }
+    user.password = password
+    user.passwordUpdated = true
+    await user.save()
+    res.json(user)
+  } catch (err) {
+    console.error('Password update error:', err)
+    res.status(500).json({ error: 'Server error during password update' })
+  }
+})
 
 module.exports = router
