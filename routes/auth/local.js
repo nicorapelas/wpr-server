@@ -174,9 +174,13 @@ router.post('/reset-password', async (req, res) => {
 // @desc   Update password
 // @access public
 router.post('/update-password', async (req, res) => {
+  console.log(`at route:`, req.body)
+
   const { username, password } = req.body
   try {
     const user = await User.findOne({ username })
+    console.log(`user at route:`, user)
+
     if (!user) {
       return res.json({ error: 'User not found' })
     }

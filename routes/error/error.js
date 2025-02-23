@@ -13,10 +13,9 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const savedError = new Error({
       _user: req.user.id,
-      savedError: error.message
+      savedError: error.message,
     })
     await savedError.save()
-    console.log(`savedError:`, savedError);
     res.json(savedError)
     return
   } catch (err) {

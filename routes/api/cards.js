@@ -132,7 +132,6 @@ router.post('/settle-cards-owing', async (req, res) => {
       purchasedAt: new Date(),
     }
   )
-  console.log('deleted card owed', _id)
   await CardOwed.deleteOne({ _id })
   const cardsOwing = await CardOwed.find()
   res.json(cardsOwing)
